@@ -1,0 +1,17 @@
+{
+    // go build -gcflags=all="-N -l" ./src/main.go 
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "GO DBG",
+        "type": "go",
+        "request": "launch",
+        "mode": "exec",
+        "program": "${workspaceFolder}/main",
+        "cwd":"${workspaceFolder}",
+        "args": [
+          "--configfile=config.json"
+        ]
+      }
+    ]
+  }
