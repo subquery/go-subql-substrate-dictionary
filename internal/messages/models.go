@@ -54,6 +54,11 @@ var (
 	SPEC_VERSION_UP_TO_DATE           = "Spec versions saved in db are up to date"
 	SPEC_VERSION_NO_PREVIOUS_WORK     = "No spec version info was saved from previous executions"
 	SPEC_VERSION_RECOVERED            = "Spec version recovered from last run"
+
+	// metadata
+	META_FAILED_POST_MESSAGE   = "Failed to get metadata from HTTP endpoint for block %d"
+	META_FAILED_TO_DECODE_BODY = "Failed to decode metadata body into a string"
+	META_FAILED_SCALE_DECODE   = "Failed to scale decode metadata"
 )
 
 const (

@@ -1,11 +1,6 @@
 package utils
 
 import (
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"os"
-
 	"github.com/itering/scale.go/types"
 	"github.com/itering/substrate-api-rpc/metadata"
 )
@@ -19,34 +14,6 @@ type SpecVersionRange struct {
 }
 
 type SpecVersionRangeList []SpecVersionRange
-
-func GetSpecVersionsFromFile() (SpecVersionRangeList, error) {
-	specFile := os.Getenv("SPEC_VERSION_RANGE_FILE")
-
-	rawSpecs, err := ioutil.ReadFile(specFile)
-	if err != nil {
-		fmt.Println("Error reading spec ranges file for spec version", err)
-		return nil, err
-	}
-
-	var specRanges SpecVersionRangeList
-	err = json.Unmarshal(rawSpecs, &specRanges)
-	if err != nil {
-		fmt.Println("Error reading spec ranges file for spec version", err)
-		return nil, err
-	}
-
-	for idx, spec := range specRanges {
-		meta, instant, err := getMetaForSpecVersion(spec.SpecVersion)
-		if err != nil {
-			return nil, err
-		}
-		specRanges[idx].Meta = meta
-		specRanges[idx].Instant = instant
-	}
-
-	return specRanges, nil
-}
 
 func (s SpecVersionRangeList) GetBlockSpecVersion(blockHeight int) int {
 	if blockHeight == 0 {

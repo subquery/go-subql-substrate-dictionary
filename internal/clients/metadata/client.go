@@ -3,14 +3,15 @@ package metadata
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"go-dictionary/internal/clients/specversion"
 	"go-dictionary/internal/db/rocksdb"
 	"go-dictionary/internal/messages"
 	"net/http"
+	"strconv"
 
 	scalecodec "github.com/itering/scale.go"
 	"github.com/itering/scale.go/utiles"
+	"github.com/itering/substrate-api-rpc/metadata"
 	"github.com/itering/substrate-api-rpc/rpc"
 )
 
@@ -31,32 +32,76 @@ func NewMetadataClient(
 	}
 }
 
-// GetMetadata retrieves the metadata for a list of spec versions
-func (metaClient *MetadataClient) GetMetadata(specvRangeList specversion.SpecVersionRangeList) *messages.DictionaryMessage {
-	for i := range specvRangeList {
-		hash, msg := metaClient.rocksdbClient.GetBlockHash(specvRangeList[i].Last)
+// GetMetadata retrieves the metadata for a list of spec versions and maps that metadata to the spec version number
+func (metaClient *MetadataClient) GetMetadata(specvRangeList specversion.SpecVersionRangeList) (*SpecVersionMetadataMap, *messages.DictionaryMessage) {
+	specVersionMetadataMap := make(map[string]*DictionaryMetadata, len(specvRangeList))
+
+	for _, specV := range specvRangeList {
+		specVersionNumber, _ := strconv.Atoi(specV.SpecVersion) // ignore the error as we should have a good integer value at this point
+		meta, msg := metaClient.getMetadata(specV.First, specVersionNumber)
 		if msg != nil {
-			return msg
+			return nil, msg
 		}
+		specVersionMetadataMap[specV.SpecVersion] = meta
+	}
+	svMetaMap := SpecVersionMetadataMap(specVersionMetadataMap)
 
-		reqBody := bytes.NewBuffer([]byte(rpc.StateGetMetadata(1, hash)))
-		resp, err := http.Post(metaClient.httpEndpoint, "application/json", reqBody)
-		if err != nil {
-			return nil
-		}
-		defer resp.Body.Close()
+	return &svMetaMap, nil
+}
 
-		metaBody := &rpc.JsonRpcResult{}
-		json.NewDecoder(resp.Body).Decode(metaBody)
-
-		mbd, _ := metaBody.ToString()
-
-		mDecoder := scalecodec.MetadataDecoder{}
-		mDecoder.Init(utiles.HexToBytes(mbd))
-		mDecoder.Process()
-
-		fmt.Println(specvRangeList[i].SpecVersion, mDecoder.Version, mDecoder.VersionNumber)
+// getMetadata retrieves the metadata instant for a block height
+func (metaClient *MetadataClient) getMetadata(blockHeight, specVersion int) (*DictionaryMetadata, *messages.DictionaryMessage) {
+	hash, msg := metaClient.rocksdbClient.GetBlockHash(blockHeight)
+	if msg != nil {
+		return nil, msg
 	}
 
-	return nil
+	reqBody := bytes.NewBuffer([]byte(rpc.StateGetMetadata(1, hash)))
+	resp, err := http.Post(metaClient.httpEndpoint, "application/json", reqBody)
+	if err != nil {
+		return nil, messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(metaClient.getMetadata),
+			err,
+			messages.META_FAILED_POST_MESSAGE,
+			blockHeight,
+		)
+	}
+	defer resp.Body.Close()
+
+	metaRawBody := &rpc.JsonRpcResult{}
+	json.NewDecoder(resp.Body).Decode(metaRawBody)
+	metaBodyString, err := metaRawBody.ToString()
+	if err != nil {
+		return nil, messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(metaClient.getMetadata),
+			err,
+			messages.META_FAILED_TO_DECODE_BODY,
+		)
+	}
+
+	rawMetaRuntime := metadata.RuntimeRaw{
+		Spec: specVersion,
+		Raw:  metaBodyString,
+	}
+	metaInstant := metadata.Process(&rawMetaRuntime)
+
+	metaDecoder := scalecodec.MetadataDecoder{}
+	metaDecoder.Init(utiles.HexToBytes(metaBodyString))
+	err = metaDecoder.Process()
+	if err != nil {
+		return nil,
+			messages.NewDictionaryMessage(
+				messages.LOG_LEVEL_ERROR,
+				messages.GetComponent(metaClient.getMetadata),
+				err,
+				messages.META_FAILED_SCALE_DECODE,
+			)
+	}
+
+	return &DictionaryMetadata{
+		Meta:        &metaDecoder.Metadata,
+		MetaInstant: metaInstant,
+	}, nil
 }
