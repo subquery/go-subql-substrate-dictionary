@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"go-dictionary/internal/clients/specversion"
 	"go-dictionary/internal/config"
 	"go-dictionary/internal/db/postgres"
@@ -60,7 +61,7 @@ func main() {
 		return
 	}
 
-	// get spec versions and block ranges
+	// SPEC VERSION -- spec version and ranges for each spec
 	specVersionClient := specversion.NewSpecVersionClient(
 		dictionaryConfiguration.SpecVersionConfig.FirstSpecVersion,
 		lastBlock,
@@ -74,16 +75,21 @@ func main() {
 		dictionaryMessage.ConsoleLog()
 		return
 	}
-	if dictionaryMessage != nil {
-		dictionaryMessage.ConsoleLog()
-		return
-	}
 
-	// get metadata for spec versions
+	// METADATA -- meta for spec version
 	metadataClient := metac.NewMetadataClient(
 		rdbClient,
 		dictionaryConfiguration.ConnectionConfig.HttpRpcEndpoint,
 	)
 
-	metadataClient.GetMetadata(specVersionsRange)
+	specVersionMetadataMap, dictionaryMessage := metadataClient.GetMetadata(specVersionsRange)
+	if dictionaryMessage != nil {
+		dictionaryMessage.ConsoleLog()
+		return
+	}
+
+	for k, v := range specVersionMetadataMap {
+		fmt.Println(k, v.MetaInstant)
+	}
+
 }

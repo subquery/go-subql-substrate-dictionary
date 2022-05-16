@@ -33,7 +33,14 @@ func NewMetadataClient(
 }
 
 // GetMetadata retrieves the metadata for a list of spec versions and maps that metadata to the spec version number
-func (metaClient *MetadataClient) GetMetadata(specvRangeList specversion.SpecVersionRangeList) (*SpecVersionMetadataMap, *messages.DictionaryMessage) {
+func (metaClient *MetadataClient) GetMetadata(specvRangeList specversion.SpecVersionRangeList) (map[string]*DictionaryMetadata, *messages.DictionaryMessage) {
+	messages.NewDictionaryMessage(
+		messages.LOG_LEVEL_INFO,
+		"",
+		nil,
+		messages.META_STARTING,
+	).ConsoleLog()
+
 	specVersionMetadataMap := make(map[string]*DictionaryMetadata, len(specvRangeList))
 
 	for _, specV := range specvRangeList {
@@ -44,9 +51,14 @@ func (metaClient *MetadataClient) GetMetadata(specvRangeList specversion.SpecVer
 		}
 		specVersionMetadataMap[specV.SpecVersion] = meta
 	}
-	svMetaMap := SpecVersionMetadataMap(specVersionMetadataMap)
 
-	return &svMetaMap, nil
+	messages.NewDictionaryMessage(
+		messages.LOG_LEVEL_SUCCESS,
+		"",
+		nil,
+		messages.META_FINISHED,
+	)
+	return specVersionMetadataMap, nil
 }
 
 // getMetadata retrieves the metadata instant for a block height
@@ -78,6 +90,7 @@ func (metaClient *MetadataClient) getMetadata(blockHeight, specVersion int) (*Di
 			messages.GetComponent(metaClient.getMetadata),
 			err,
 			messages.META_FAILED_TO_DECODE_BODY,
+			blockHeight,
 		)
 	}
 
@@ -97,6 +110,7 @@ func (metaClient *MetadataClient) getMetadata(blockHeight, specVersion int) (*Di
 				messages.GetComponent(metaClient.getMetadata),
 				err,
 				messages.META_FAILED_SCALE_DECODE,
+				blockHeight,
 			)
 	}
 

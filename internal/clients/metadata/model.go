@@ -10,6 +10,4 @@ type (
 		Meta        *types.MetadataStruct
 		MetaInstant *metadata.Instant
 	}
-
-	SpecVersionMetadataMap map[string]*DictionaryMetadata
 )

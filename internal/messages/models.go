@@ -57,8 +57,10 @@ var (
 
 	// metadata
 	META_FAILED_POST_MESSAGE   = "Failed to get metadata from HTTP endpoint for block %d"
-	META_FAILED_TO_DECODE_BODY = "Failed to decode metadata body into a string"
-	META_FAILED_SCALE_DECODE   = "Failed to scale decode metadata"
+	META_FAILED_TO_DECODE_BODY = "Failed to decode metadata body into a string for block %d"
+	META_FAILED_SCALE_DECODE   = "Failed to scale decode metadata for block %d"
+	META_STARTING              = "Metadata info is retrieved from the rpc endpoint"
+	META_FINISHED              = "Metadata client successfully finished processing"
 )
 
 const (
