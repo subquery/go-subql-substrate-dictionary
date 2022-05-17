@@ -1,4 +1,4 @@
-package models
+package extrinsic
 
 type Extrinsic struct {
 	Id          string //blockHeight-extrinsicId
