@@ -5,12 +5,11 @@
     },
     "connection_config": {
         "http_rpc_endpoint": "http://127.0.0.1:9933",
-        "ws_rpc_endpoint": "ws://localhost:9944",
         "ws_events_batch_size": 1000
     },
     "workers_config": {
-        "spec_version_workers": 10,
-        "events_workers": 10
+        "events_workers": 10,
+        "extrinsic_workers": 10
     },
     "chain_config": {
         "first_spec_version": 0

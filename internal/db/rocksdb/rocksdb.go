@@ -3,9 +3,7 @@ package rocksdb
 import (
 	"encoding/hex"
 	"go-dictionary/internal/messages"
-	"log"
 	"strconv"
-	"sync"
 
 	"github.com/linxGnu/grocksdb"
 )
@@ -105,14 +103,18 @@ func BlockHeightToKey(blockHeight int) []byte {
 	}
 }
 
-func (rc *RockClient) GetHeaderForBlockLookupKey(key []byte) ([]byte, error) {
-	header, err := rc.db.GetCF(rc.ro, rc.columnHandles[COL_HEADER], key)
-	return header.Data(), err
-}
-
-func (rc *RockClient) GetBodyForBlockLookupKey(key []byte) ([]byte, error) {
+// GetBodyForBlockLookupKey retrieves the raw block body being given a lookup key
+func (rc *RockClient) GetBodyForBlockLookupKey(key []byte) ([]byte, *messages.DictionaryMessage) {
 	body, err := rc.db.GetCF(rc.ro, rc.columnHandles[COL_BODY], key)
-	return body.Data(), err
+	if err != nil {
+		return []byte{}, messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(rc.GetBodyForBlockLookupKey),
+			err,
+			messages.ROCKSDB_FAILED_BODY,
+		)
+	}
+	return body.Data(), nil
 }
 
 // GetLastBlockSynced gets the last synced block from the rocksdb database
@@ -147,78 +149,6 @@ func (rc *RockClient) GetBlockHash(height int) (string, *messages.DictionaryMess
 	}
 	hash := hex.EncodeToString(lk[4:])
 	return hash, nil
-}
-
-func (rc *RockClient) StartProcessing(bq *JobQueueBody, hq *JobQueueHeader, lastBlockSynced int) {
-	log.Println("[INFO] LAST BLOCK SYNCED -", lastBlockSynced)
-
-	preProcessChannel := make(chan int, 10000000)
-
-	var pWg sync.WaitGroup
-	pWg.Add(1)
-	go rc.PreProcessWorker(&pWg, bq, hq, preProcessChannel)
-
-	for i := 0; i < lastBlockSynced; i++ {
-		preProcessChannel <- i
-	}
-	close(preProcessChannel)
-
-	pWg.Wait()
-}
-
-func (rc *RockClient) GetHeaderRaw(wg *sync.WaitGroup, headerJob *HeaderJob, hq *JobQueueHeader) {
-	defer wg.Done()
-	header, err := rc.GetHeaderForBlockLookupKey(headerJob.BlockLookupKey)
-	if err != nil {
-		log.Println("[ERR]", err, "- could not get the header for block lookup key!")
-	}
-	headerJob.BlockHeader = header
-	hq.Submit(headerJob)
-}
-
-func (rc *RockClient) GetBodyRaw(wg *sync.WaitGroup, bodyJob *BodyJob, bq *JobQueueBody) {
-	defer wg.Done()
-	body, err := rc.GetBodyForBlockLookupKey(bodyJob.BlockLookupKey)
-	if err != nil {
-		log.Println("[ERR]", err, "- could not get the body for block lookup key!!")
-	}
-	bodyJob.BlockBody = body
-	bq.Submit(bodyJob)
-}
-
-func (rc *RockClient) PreProcessWorker(wg *sync.WaitGroup, bq *JobQueueBody, hq *JobQueueHeader, ppc chan int) {
-	log.Println("[+] Starting PreProcessWorker!")
-	defer wg.Done()
-
-	for blockHeight := range ppc {
-		bodyJob := BodyJob{}
-		headerJob := HeaderJob{}
-
-		bodyJob.BlockHeight = blockHeight
-		headerJob.BlockHeight = blockHeight
-
-		key, err := rc.GetLookupKeyForBlockHeight(blockHeight)
-		if err != nil {
-			log.Println("[ERR]", err, blockHeight, "- could not get the lookup key!")
-		}
-
-		bodyJob.BlockLookupKey = key
-		headerJob.BlockLookupKey = key
-
-		hash := hex.EncodeToString(key[4:])
-		bodyJob.BlockHash = hash
-		headerJob.BlockHash = hash
-
-		var rawWg sync.WaitGroup
-		rawWg.Add(2)
-		// rawWg.Add(1)
-		go rc.GetHeaderRaw(&rawWg, &headerJob, hq)
-		go rc.GetBodyRaw(&rawWg, &bodyJob, bq)
-		rawWg.Wait()
-	}
-	close(hq.internalQueue)
-	close(bq.internalQueue)
-	log.Println("[-] Exiting PreProcessWorker...")
 }
 
 func (rc *RockClient) Close() {

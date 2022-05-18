@@ -16,7 +16,8 @@ var (
 	white  = "\033[97m"
 
 	// generics
-	FAILED_ATOI = "Failed to convert string to integer"
+	FAILED_ATOI           = "Failed to convert string to integer"
+	FAILED_TYPE_ASSERTION = "Failed type assertion"
 
 	// configuration info messages
 	CONFIG_NO_CUSTOM_PATH_SPECIFIED = "No config file path specified with --c, --configfile. Using default path."
@@ -30,6 +31,7 @@ var (
 	ROCKSDB_FAILED_LOOKUP_KEY               = "Failed to get lookup key for block %d"
 	ROCKSDB_CONNECTED                       = "Successfully connected to rocksdb instance"
 	ROCKSDB_FAILED_TO_GET_LAST_SYNCED_BLOCK = "Failed to get last synced block"
+	ROCKSDB_FAILED_BODY                     = "Failed to retrieve block body from rocksdb"
 
 	// postgres
 	POSTGRES_CONNECTING                        = "Connecting to postgres database using '%s'"
@@ -61,6 +63,10 @@ var (
 	META_FAILED_SCALE_DECODE   = "Failed to scale decode metadata for block %d"
 	META_STARTING              = "Metadata info is retrieved from the rpc endpoint"
 	META_FINISHED              = "Metadata client successfully finished processing"
+
+	// extrinsic
+	EXTRINSIC_DECODE_FAILED = "Failed to decode extrinsic for block %d"
+	EXTRINSIC_FIELD_FAILED  = "Failed to get extrinsic %s for block %d"
 )
 
 const (

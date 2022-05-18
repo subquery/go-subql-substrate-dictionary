@@ -9,3 +9,9 @@ type Extrinsic struct {
 	Success     bool
 	IsSigned    bool
 }
+
+//TODO: change the structure if necessary
+type ExtrinsicJob struct {
+	BlockHeight    int
+	BlockLookupKey []byte
+}
