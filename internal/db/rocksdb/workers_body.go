@@ -9,7 +9,6 @@ import (
 	"strings"
 	"sync"
 
-	scalecodec "github.com/itering/scale.go"
 	"github.com/itering/scale.go/types"
 	"github.com/itering/substrate-api-rpc"
 	"github.com/mr-tron/base58"
@@ -201,113 +200,6 @@ func (job *BodyJob) ProcessBody(extrinsicsChannel chan *models.Extrinsic, evmTra
 			}
 		} else {
 			log.Println("[ERR] ", err, "- could not decode extrinsic!", specV, job.BlockHeight)
-		}
-	}
-}
-
-func (job *BodyJob) ExtrinsicsModuleBalances(extrinsic *models.Extrinsic, decodedExtrinsics map[string]interface{}, evmTransactionsChannel chan *models.EvmTransaction) {
-	switch extrinsic.Call {
-	case "transfer":
-		log.Println(decodedExtrinsics, job.BlockHeight)
-	case "force_transfer":
-		log.Println("balances -> forcetransfer")
-	case "transferall":
-		log.Println("balances -> transferall")
-	case "transferkeepalive":
-		log.Println("balances -> transferkeepalive")
-	default:
-		log.Println(extrinsic.Call)
-	}
-}
-
-func (job *BodyJob) ProcessBalances(transactions []scalecodec.ExtrinsicParam, txHash string, evmTransactionsChannel chan *models.EvmTransaction) {
-	for transactionPos := range transactions {
-		if transactions[transactionPos].Name == "call" {
-			if value, ok := transactions[transactionPos].Value.(map[string]interface{}); ok {
-				if callModule, ok := value["call_module"].(string); ok && callModule == "Balances" {
-					temporaryTransaction := job.ProcessBalancesTransaction(transactions[transactionPos], txHash)
-					evmTransactionsChannel <- &temporaryTransaction
-				}
-			}
-		}
-	}
-}
-
-func (job *BodyJob) ProcessBalancesTransaction(transaction scalecodec.ExtrinsicParam, txHash string) models.EvmTransaction {
-	tempTransaction := models.EvmTransaction{}
-	if transactionData, ok := transaction.Value.(map[string]interface{}); ok {
-		tempTransaction.Id = strconv.Itoa(job.BlockHeight) + "-" + strconv.Itoa(job.TransactionID)
-		tempTransaction.TxHash = txHash
-		if params, ok := transactionData["params"].([]types.ExtrinsicParam); ok {
-			for paramPos := range params {
-				if params[paramPos].Name == "source" {
-					if source, ok := params[paramPos].Value.(string); ok {
-						tempTransaction.From = EncodeAddressId(source)
-					}
-				}
-				if params[paramPos].Name == "dest" {
-					if dest, ok := params[paramPos].Value.(string); ok {
-						tempTransaction.To = EncodeAddressId(dest)
-					}
-				}
-			}
-			if callModule, ok := transactionData["call_module"].(string); ok {
-				tempTransaction.Func = callModule
-			}
-			tempTransaction.BlockHeight = job.BlockHeight
-			tempTransaction.Success = true
-		}
-	}
-	job.TransactionID++
-	return tempTransaction
-}
-
-func (job *BodyJob) ExtractInfoFromBalances(transactionDataRaw interface{}, txHash string) models.EvmTransaction {
-	tempTransaction := models.EvmTransaction{}
-	if transactionData, ok := transactionDataRaw.(map[string]interface{}); ok {
-		if transactionModule, ok := transactionData["call_module"].(string); ok && transactionModule == "Balances" {
-			tempTransaction.Id = strconv.Itoa(job.BlockHeight) + "-" + strconv.Itoa(job.TransactionID)
-			tempTransaction.TxHash = txHash
-			tempTransaction.Func = transactionModule
-			if transactionParams, ok := transactionData["params"].([]types.ExtrinsicParam); ok {
-				for tpPos := range transactionParams {
-					if transactionParams[tpPos].Name == "source" {
-						if source, ok := transactionParams[tpPos].Value.(string); ok {
-							tempTransaction.From = EncodeAddressId(source)
-						}
-					}
-					if transactionParams[tpPos].Name == "dest" {
-						if dest, ok := transactionParams[tpPos].Value.(string); ok {
-							tempTransaction.To = EncodeAddressId(dest)
-						}
-					}
-					tempTransaction.BlockHeight = job.BlockHeight
-					tempTransaction.Success = true
-				}
-			}
-		}
-	}
-	job.TransactionID++
-	return tempTransaction
-}
-
-func (job *BodyJob) ProcessUtilityTransaction(transactions []scalecodec.ExtrinsicParam, txHash string, evmTransactionsChannel chan *models.EvmTransaction) {
-	for transactionPos := range transactions {
-		if transactions[transactionPos].Name == "calls" {
-			if transactionValue, ok := transactions[transactionPos].Value.([]interface{}); ok {
-				for tvPos := range transactionValue {
-					if params, ok := transactionValue[tvPos].(map[string]interface{})["params"].([]types.ExtrinsicParam); ok {
-						for paramPos := range params {
-							if params[paramPos].Name == "call" {
-								if transactionModule, ok := params[paramPos].Value.(map[string]interface{})["call_module"]; ok && transactionModule == "Balances" {
-									temporaryTransaction := job.ExtractInfoFromBalances(params[paramPos].Value, txHash)
-									evmTransactionsChannel <- &temporaryTransaction
-								}
-							}
-						}
-					}
-				}
-			}
 		}
 	}
 }

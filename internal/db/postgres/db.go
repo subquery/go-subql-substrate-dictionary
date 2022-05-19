@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"go-dictionary/internal/config"
 	"go-dictionary/internal/messages"
-	"log"
 
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -162,12 +161,3 @@ func (pc *PostgresClient) Close() {
 // 	}
 // 	log.Println("[-] Exited ExtrinsicsWorker...")
 // }
-
-func (pc *PostgresClient) InsertByQuery(query string) error {
-	_, err := pc.Pool.Exec(context.Background(), query)
-	if err != nil {
-		log.Println("[ERR]", err, "- could not insert to postgres by query!")
-		return err
-	}
-	return nil
-}

@@ -59,7 +59,8 @@ func NewExtrinsicClient(
 }
 
 func (client *ExtrinsicClient) Run() *messages.DictionaryMessage {
-
+	//start db worker
+	//start extrinsic workers
 	return nil
 }
 
@@ -75,7 +76,6 @@ func (client *ExtrinsicClient) startWorker() {
 	bodyDecoder := types.ScaleDecoder{}
 
 	for {
-		//TODO: function for each part of extrinsic??
 		job := <-client.jobChan
 
 		rawBodyData, msg := client.rocksdbClient.GetBodyForBlockLookupKey(job.BlockLookupKey)
@@ -129,60 +129,70 @@ func (client *ExtrinsicClient) startWorker() {
 		}
 
 		for idx, decodedExtrinsic := range decodedExtrinsics {
-			extrinsicModel := Extrinsic{}
-			extrinsicModel.Id = fmt.Sprintf("%d-%d", job.BlockHeight, idx)
-
-			callModule, ok := decodedExtrinsic["call_module"].(string)
-			if !ok {
-				messages.NewDictionaryMessage(
-					messages.LOG_LEVEL_ERROR,
-					messages.GetComponent(client.startWorker),
-					nil,
-					messages.EXTRINSIC_FIELD_FAILED,
-					"call_module",
-					job.BlockHeight,
-				).ConsoleLog()
-				panic(nil)
+			extrinsicModel := Extrinsic{
+				Id:          fmt.Sprintf("%d-%d", job.BlockHeight, idx),
+				Module:      getCallModule(job.BlockHeight, decodedExtrinsic),
+				Call:        getCallFunction(job.BlockHeight, decodedExtrinsic),
+				BlockHeight: job.BlockHeight,
+				Success:     true, //TODO: replace with success state from events
+				TxHash:      getHash(job.BlockHeight, decodedExtrinsic),
+				IsSigned:    isSigned(decodedExtrinsic),
 			}
-			extrinsicModel.Module = strings.ToLower(callModule)
-
-			callFunction, ok := decodedExtrinsic["call_module_function"].(string)
-			if !ok {
-				messages.NewDictionaryMessage(
-					messages.LOG_LEVEL_ERROR,
-					messages.GetComponent(client.startWorker),
-					nil,
-					messages.EXTRINSIC_FIELD_FAILED,
-					"call_module_function",
-					job.BlockHeight,
-				).ConsoleLog()
-				panic(nil)
-			}
-			extrinsicModel.Call = callFunction
-
-			extrinsicModel.BlockHeight = job.BlockHeight
-			extrinsicModel.Success = true //TODO: replace with success state from events
-
-			txHash, ok := decodedExtrinsic["extrinsic_hash"].(string)
-			if !ok {
-				messages.NewDictionaryMessage(
-					messages.LOG_LEVEL_ERROR,
-					messages.GetComponent(client.startWorker),
-					nil,
-					messages.EXTRINSIC_FIELD_FAILED,
-					"extrinsic_hash",
-					job.BlockHeight,
-				).ConsoleLog()
-				panic(nil)
-			}
-			extrinsicModel.TxHash = txHash
-
-			_, ok = decodedExtrinsic["signature"]
-			if !ok {
-				extrinsicModel.IsSigned = false
-			} else {
-				extrinsicModel.IsSigned = true
-			}
+			client.pgClient.insertExtrinsic(&extrinsicModel)
 		}
 	}
+}
+
+func getCallModule(blockHeight int, decodedExtrinsic map[string]interface{}) string {
+	callModule, ok := decodedExtrinsic[extrinsicCallModuleField].(string)
+	if !ok {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(getCallModule),
+			nil,
+			messages.EXTRINSIC_FIELD_FAILED,
+			extrinsicCallModuleField,
+			blockHeight,
+		).ConsoleLog()
+		panic(nil)
+	}
+
+	return strings.ToLower(callModule)
+}
+
+func getCallFunction(blockHeight int, decodedExtrinsic map[string]interface{}) string {
+	callFunction, ok := decodedExtrinsic[extrinsicFunctionField].(string)
+	if !ok {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(getCallFunction),
+			nil,
+			messages.EXTRINSIC_FIELD_FAILED,
+			extrinsicFunctionField,
+			blockHeight,
+		).ConsoleLog()
+		panic(nil)
+	}
+	return callFunction
+}
+
+func getHash(blockHeight int, decodedExtrinsic map[string]interface{}) string {
+	txHash, ok := decodedExtrinsic[extrinsicHashField].(string)
+	if !ok {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(getHash()),
+			nil,
+			messages.EXTRINSIC_FIELD_FAILED,
+			extrinsicHashField,
+			blockHeight,
+		).ConsoleLog()
+		panic(nil)
+	}
+	return txHash
+}
+
+func isSigned(decodedExtrinsic map[string]interface{}) bool {
+	_, ok := decodedExtrinsic["signature"]
+	return ok
 }
