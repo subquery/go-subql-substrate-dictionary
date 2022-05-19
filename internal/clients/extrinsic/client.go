@@ -58,10 +58,15 @@ func NewExtrinsicClient(
 	}
 }
 
-func (client *ExtrinsicClient) Run() *messages.DictionaryMessage {
-	//start db worker
-	//start extrinsic workers
-	return nil
+// Run starts the
+func (client *ExtrinsicClient) Run() {
+	go client.pgClient.startDbWorker()
+
+	count := 0
+	for count < client.workersCount {
+		go client.startWorker()
+		count++
+	}
 }
 
 // SendWork will send a job to the extrinsic workers
@@ -181,7 +186,7 @@ func getHash(blockHeight int, decodedExtrinsic map[string]interface{}) string {
 	if !ok {
 		messages.NewDictionaryMessage(
 			messages.LOG_LEVEL_ERROR,
-			messages.GetComponent(getHash()),
+			messages.GetComponent(getHash),
 			nil,
 			messages.EXTRINSIC_FIELD_FAILED,
 			extrinsicHashField,

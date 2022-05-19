@@ -13,6 +13,7 @@ func (repoClient *extrinsicRepoClient) insertExtrinsic(extrinsic *Extrinsic) {
 	repoClient.dbChan <- extrinsic
 }
 
+//TODO: send batches at block level and inser an entire batch of blocks
 func (repoClient *extrinsicRepoClient) startDbWorker() {
 	insertItems := make([][]interface{}, repoClient.batchSize)
 	counter := 0

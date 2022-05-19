@@ -84,80 +84,9 @@ func (pc *PostgresClient) Close() {
 	pc.Pool.Close()
 }
 
-// func (pc *PostgresClient) EventsWorker(wg *sync.WaitGroup) {
-// 	log.Println("[+] Starting EventsWorker!")
-// 	defer wg.Done()
-// 	maxBatch := 100000
-// 	counter := 0
-// 	insertItems := [][]interface{}{}
-// 	for event := range pc.WorkersChannels.EventsChannel {
 // 		insertItems = append(insertItems, []interface{}{event.Id, event.Module, event.Event, event.BlockHeight})
-// 		counter++
-// 		if counter == maxBatch {
-// 			_, err := pc.Pool.CopyFrom(
-// 				context.Background(),
-// 				pgx.Identifier{"events"},
-// 				[]string{"id", "module", "event", "block_height"},
-// 				pgx.CopyFromRows(insertItems),
-// 			)
-// 			if err != nil {
-// 				log.Println("[ERR]", err, "- could not insert items for events with CopyFrom!")
-// 			} else {
-// 				log.Println("[INFO] Inserted 100k events")
-// 			}
-// 			insertItems = nil
-// 			counter = 0
-// 		}
-// 	}
 // 	_, err := pc.Pool.CopyFrom(
 // 		context.Background(),
 // 		pgx.Identifier{"events"},
 // 		[]string{"id", "module", "event", "block_height"},
 // 		pgx.CopyFromRows(insertItems),
-// 	)
-// 	if err != nil {
-// 		log.Println("[ERR]", err, "- could not insert items for events with CopyFrom!")
-// 	} else {
-// 		log.Println("[INFO] Inserted remaining events")
-// 	}
-// 	log.Println("[-] Exited EventsWorker...")
-// }
-
-// func (pc *PostgresClient) ExtrinsicsWorker(wg *sync.WaitGroup) {
-// 	log.Println("[+] Started ExtrinsicsWorker!")
-// 	defer wg.Done()
-// 	maxBatch := 100000
-// 	counter := 0
-// 	insertItems := [][]interface{}{}
-// 	for extrinsic := range pc.WorkersChannels.ExtrinsicsChannel {
-// 		insertItems = append(insertItems, []interface{}{extrinsic.Id, extrinsic.TxHash, extrinsic.Module, extrinsic.Call, extrinsic.BlockHeight, extrinsic.Success, extrinsic.IsSigned})
-// 		counter++
-// 		if counter == maxBatch {
-// 			_, err := pc.Pool.CopyFrom(
-// 				context.Background(),
-// 				pgx.Identifier{"extrinsics"},
-// 				[]string{"id", "tx_hash", "module", "call", "block_height", "success", "is_signed"},
-// 				pgx.CopyFromRows(insertItems),
-// 			)
-// 			if err != nil {
-// 				log.Println("[ERR]", err, "- could not insert items for extrinsics with CopyFrom!")
-// 			} else {
-// 				log.Println("[INFO] Inserted 100k extrinsics")
-// 			}
-// 			insertItems = nil
-// 			counter = 0
-// 		}
-// 	}
-// 	_, err := pc.Pool.CopyFrom(
-// 		context.Background(),
-// 		pgx.Identifier{"extrinsics"},
-// 		[]string{"id", "tx_hash", "module", "call", "block_height", "success", "is_signed"},
-// 		pgx.CopyFromRows(insertItems),
-// 	)
-// 	if err != nil {
-// 		log.Println("[ERR]", err, "- could not insert items for extrinsics with CopyFrom!")
-// 	} else {
-// 		log.Println("[INFO] Inserted remaining extrinsics")
-// 	}
-// 	log.Println("[-] Exited ExtrinsicsWorker...")
-// }
