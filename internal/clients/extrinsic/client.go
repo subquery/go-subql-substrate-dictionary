@@ -18,7 +18,7 @@ type (
 		pgClient               extrinsicRepoClient
 		rocksdbClient          *rocksdb.RockClient
 		workersCount           int
-		jobChan                chan *ExtrinsicJob
+		batchChan              chan chan *ExtrinsicJob
 		specVersions           specversion.SpecVersionRangeList
 		specVersionMetadataMap map[string]*metadata.DictionaryMetadata
 	}
@@ -27,6 +27,10 @@ type (
 		*postgres.PostgresClient
 		batchSize int
 		dbChan    chan *Extrinsic
+	}
+
+	ExtrinsicBatchChannel struct {
+		batchChannel chan *ExtrinsicJob
 	}
 )
 
@@ -42,7 +46,7 @@ func NewExtrinsicClient(
 	specVersions specversion.SpecVersionRangeList,
 	specVersionMetadataMap map[string]*metadata.DictionaryMetadata,
 ) *ExtrinsicClient {
-	jobChan := make(chan *ExtrinsicJob, workersCount)
+	batchChan := make(chan chan *ExtrinsicJob, workersCount)
 	dbChan := make(chan *Extrinsic, workersCount)
 	return &ExtrinsicClient{
 		pgClient: extrinsicRepoClient{
@@ -52,13 +56,13 @@ func NewExtrinsicClient(
 		},
 		rocksdbClient:          rocksdbClient,
 		workersCount:           workersCount,
-		jobChan:                jobChan,
+		batchChan:              batchChan,
 		specVersions:           specVersions,
 		specVersionMetadataMap: specVersionMetadataMap,
 	}
 }
 
-// Run starts the
+// Run starts the extrinsics worker
 func (client *ExtrinsicClient) Run() {
 	go client.pgClient.startDbWorker()
 
@@ -67,6 +71,21 @@ func (client *ExtrinsicClient) Run() {
 		go client.startWorker()
 		count++
 	}
+}
+
+// StartBatch starts the work for a batch of blocks; it creates a channel for the batch
+// and sends it to each worker
+func (client *ExtrinsicClient) StartBatch() *ExtrinsicBatchChannel {
+	batchChan := make(chan *ExtrinsicJob, client.workersCount)
+	extrinsicBatchChannel := ExtrinsicBatchChannel{
+		batchChannel: batchChan,
+	}
+
+	for i := 0; i < client.workersCount; i++ {
+		client.batchChan <- batchChan
+	}
+
+	return &extrinsicBatchChannel
 }
 
 // SendWork will send a job to the extrinsic workers
@@ -80,32 +99,19 @@ func (client *ExtrinsicClient) SendWork(blockHeight int, lookupKey []byte) {
 func (client *ExtrinsicClient) startWorker() {
 	bodyDecoder := types.ScaleDecoder{}
 
-	for {
-		job := <-client.jobChan
+	for jobChan := range client.batchChan {
+		for job := range jobChan {
 
-		rawBodyData, msg := client.rocksdbClient.GetBodyForBlockLookupKey(job.BlockLookupKey)
-		if msg != nil {
-			msg.ConsoleLog()
-			panic(nil) // we can execute deffered code
-		}
+			rawBodyData, msg := client.rocksdbClient.GetBodyForBlockLookupKey(job.BlockLookupKey)
+			if msg != nil {
+				msg.ConsoleLog()
+				panic(nil) // we can execute deffered code
+			}
 
-		bodyDecoder.Init(types.ScaleBytes{Data: rawBodyData}, nil)
-		decodedBody := bodyDecoder.ProcessAndUpdateData(bodyTypeString)
+			bodyDecoder.Init(types.ScaleBytes{Data: rawBodyData}, nil)
+			decodedBody := bodyDecoder.ProcessAndUpdateData(bodyTypeString)
 
-		bodyList, ok := decodedBody.([]interface{})
-		if !ok {
-			messages.NewDictionaryMessage(
-				messages.LOG_LEVEL_ERROR,
-				messages.GetComponent(client.startWorker),
-				nil,
-				messages.FAILED_TYPE_ASSERTION,
-			).ConsoleLog()
-			panic(nil)
-		}
-
-		rawExtrinsicList := []string{}
-		for _, bodyInterface := range bodyList {
-			rawExtrinsic, ok := bodyInterface.(string)
+			bodyList, ok := decodedBody.([]interface{})
 			if !ok {
 				messages.NewDictionaryMessage(
 					messages.LOG_LEVEL_ERROR,
@@ -115,35 +121,49 @@ func (client *ExtrinsicClient) startWorker() {
 				).ConsoleLog()
 				panic(nil)
 			}
-			rawExtrinsicList = append(rawExtrinsicList, rawExtrinsic)
-		}
 
-		specVersion := client.specVersions.GetSpecVersionForBlock(job.BlockHeight)
-		metadataInstant := client.specVersionMetadataMap[fmt.Sprintf("%d", specVersion)].MetaInstant
-
-		decodedExtrinsics, err := substrate.DecodeExtrinsic(rawExtrinsicList, metadataInstant, specVersion)
-		if err != nil {
-			messages.NewDictionaryMessage(
-				messages.LOG_LEVEL_ERROR,
-				messages.GetComponent(client.startWorker),
-				err,
-				messages.EXTRINSIC_DECODE_FAILED,
-				job.BlockHeight,
-			).ConsoleLog()
-			panic(nil)
-		}
-
-		for idx, decodedExtrinsic := range decodedExtrinsics {
-			extrinsicModel := Extrinsic{
-				Id:          fmt.Sprintf("%d-%d", job.BlockHeight, idx),
-				Module:      getCallModule(job.BlockHeight, decodedExtrinsic),
-				Call:        getCallFunction(job.BlockHeight, decodedExtrinsic),
-				BlockHeight: job.BlockHeight,
-				Success:     true, //TODO: replace with success state from events
-				TxHash:      getHash(job.BlockHeight, decodedExtrinsic),
-				IsSigned:    isSigned(decodedExtrinsic),
+			rawExtrinsicList := []string{}
+			for _, bodyInterface := range bodyList {
+				rawExtrinsic, ok := bodyInterface.(string)
+				if !ok {
+					messages.NewDictionaryMessage(
+						messages.LOG_LEVEL_ERROR,
+						messages.GetComponent(client.startWorker),
+						nil,
+						messages.FAILED_TYPE_ASSERTION,
+					).ConsoleLog()
+					panic(nil)
+				}
+				rawExtrinsicList = append(rawExtrinsicList, rawExtrinsic)
 			}
-			client.pgClient.insertExtrinsic(&extrinsicModel)
+
+			specVersion := client.specVersions.GetSpecVersionForBlock(job.BlockHeight)
+			metadataInstant := client.specVersionMetadataMap[fmt.Sprintf("%d", specVersion)].MetaInstant
+
+			decodedExtrinsics, err := substrate.DecodeExtrinsic(rawExtrinsicList, metadataInstant, specVersion)
+			if err != nil {
+				messages.NewDictionaryMessage(
+					messages.LOG_LEVEL_ERROR,
+					messages.GetComponent(client.startWorker),
+					err,
+					messages.EXTRINSIC_DECODE_FAILED,
+					job.BlockHeight,
+				).ConsoleLog()
+				panic(nil)
+			}
+
+			for idx, decodedExtrinsic := range decodedExtrinsics {
+				extrinsicModel := Extrinsic{
+					Id:          fmt.Sprintf("%d-%d", job.BlockHeight, idx),
+					Module:      getCallModule(job.BlockHeight, decodedExtrinsic),
+					Call:        getCallFunction(job.BlockHeight, decodedExtrinsic),
+					BlockHeight: job.BlockHeight,
+					Success:     true, //TODO: replace with success state from events
+					TxHash:      getHash(job.BlockHeight, decodedExtrinsic),
+					IsSigned:    isSigned(decodedExtrinsic),
+				}
+				client.pgClient.insertExtrinsic(&extrinsicModel)
+			}
 		}
 	}
 }
