@@ -25,8 +25,9 @@ type (
 
 	extrinsicRepoClient struct {
 		*postgres.PostgresClient
-		batchSize int
-		dbChan    chan *Extrinsic
+		dbChan            chan *Extrinsic
+		workersCount      int
+		batchFinishedChan chan struct{}
 	}
 
 	ExtrinsicBatchChannel struct {
@@ -40,19 +41,22 @@ const (
 
 func NewExtrinsicClient(
 	pgClient *postgres.PostgresClient,
-	dbBatchSize int,
 	rocksdbClient *rocksdb.RockClient,
 	workersCount int,
 	specVersions specversion.SpecVersionRangeList,
 	specVersionMetadataMap map[string]*metadata.DictionaryMetadata,
 ) *ExtrinsicClient {
+
 	batchChan := make(chan chan *ExtrinsicJob, workersCount)
 	dbChan := make(chan *Extrinsic, workersCount)
+	batchFinishedChan := make(chan struct{}, 1)
+
 	return &ExtrinsicClient{
 		pgClient: extrinsicRepoClient{
 			pgClient,
-			dbBatchSize,
 			dbChan,
+			workersCount,
+			batchFinishedChan,
 		},
 		rocksdbClient:          rocksdbClient,
 		workersCount:           workersCount,
@@ -76,11 +80,13 @@ func (client *ExtrinsicClient) Run() {
 // StartBatch starts the work for a batch of blocks; it creates a channel for the batch
 // and sends it to each worker
 func (client *ExtrinsicClient) StartBatch() *ExtrinsicBatchChannel {
+	// create new job channel for a range
 	batchChan := make(chan *ExtrinsicJob, client.workersCount)
 	extrinsicBatchChannel := ExtrinsicBatchChannel{
 		batchChannel: batchChan,
 	}
 
+	// send the job channel to all workers
 	for i := 0; i < client.workersCount; i++ {
 		client.batchChan <- batchChan
 	}
@@ -88,9 +94,18 @@ func (client *ExtrinsicClient) StartBatch() *ExtrinsicBatchChannel {
 	return &extrinsicBatchChannel
 }
 
+// WaitForBatch blocks, waiting for the current batch to finish
+func (client *ExtrinsicClient) WaitForBatch() {
+	<-client.pgClient.batchFinishedChan
+}
+
+func (extrinsicBatchChan *ExtrinsicBatchChannel) Close() {
+	close(extrinsicBatchChan.batchChannel)
+}
+
 // SendWork will send a job to the extrinsic workers
-func (client *ExtrinsicClient) SendWork(blockHeight int, lookupKey []byte) {
-	client.jobChan <- &ExtrinsicJob{
+func (extrinsicBatchChan *ExtrinsicBatchChannel) SendWork(blockHeight int, lookupKey []byte) {
+	extrinsicBatchChan.batchChannel <- &ExtrinsicJob{
 		BlockHeight:    blockHeight,
 		BlockLookupKey: lookupKey,
 	}
@@ -105,7 +120,7 @@ func (client *ExtrinsicClient) startWorker() {
 			rawBodyData, msg := client.rocksdbClient.GetBodyForBlockLookupKey(job.BlockLookupKey)
 			if msg != nil {
 				msg.ConsoleLog()
-				panic(nil) // we can execute deffered code
+				panic(nil)
 			}
 
 			bodyDecoder.Init(types.ScaleBytes{Data: rawBodyData}, nil)
@@ -153,6 +168,7 @@ func (client *ExtrinsicClient) startWorker() {
 			}
 
 			for idx, decodedExtrinsic := range decodedExtrinsics {
+				// fmt.Println(decodedExtrinsic) //dbg
 				extrinsicModel := Extrinsic{
 					Id:          fmt.Sprintf("%d-%d", job.BlockHeight, idx),
 					Module:      getCallModule(job.BlockHeight, decodedExtrinsic),
@@ -165,6 +181,8 @@ func (client *ExtrinsicClient) startWorker() {
 				client.pgClient.insertExtrinsic(&extrinsicModel)
 			}
 		}
+		// send a nil extrinsic when the work is done
+		client.pgClient.insertExtrinsic(nil)
 	}
 }
 
@@ -204,15 +222,16 @@ func getCallFunction(blockHeight int, decodedExtrinsic map[string]interface{}) s
 func getHash(blockHeight int, decodedExtrinsic map[string]interface{}) string {
 	txHash, ok := decodedExtrinsic[extrinsicHashField].(string)
 	if !ok {
-		messages.NewDictionaryMessage(
-			messages.LOG_LEVEL_ERROR,
-			messages.GetComponent(getHash),
-			nil,
-			messages.EXTRINSIC_FIELD_FAILED,
-			extrinsicHashField,
-			blockHeight,
-		).ConsoleLog()
-		panic(nil)
+		return ""
+		// messages.NewDictionaryMessage(
+		// 	messages.LOG_LEVEL_ERROR,
+		// 	messages.GetComponent(getHash),
+		// 	nil,
+		// 	messages.EXTRINSIC_FIELD_FAILED,
+		// 	extrinsicHashField,
+		// 	blockHeight,
+		// ).ConsoleLog()
+		// panic(nil)
 	}
 	return txHash
 }

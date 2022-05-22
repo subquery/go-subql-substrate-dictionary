@@ -11,7 +11,6 @@ type PostgresConfig struct {
 
 type ConnectionConfig struct {
 	HttpRpcEndpoint string `json:"http_rpc_endpoint"`
-	EventsBatchSize int    `json:"ws_events_batch_size"`
 }
 
 type ChainConfig struct {
@@ -19,8 +18,9 @@ type ChainConfig struct {
 }
 
 type WorkersConfig struct {
-	EventsWorkers    int `json:"events_workers"`
-	ExtrinsicWorkers int `json:"extrinsic_workers"`
+	EventsWorkers      int `json:"events_workers"`
+	ExtrinsicWorkers   int `json:"extrinsic_workers"`
+	ExtrinsicBatchSize int `json:"extrinsic_batch_size"`
 }
 
 type RocksdbConfig struct {

@@ -4,12 +4,12 @@
         "rocksdb_secondary_path": "/tmp/secondary"
     },
     "connection_config": {
-        "http_rpc_endpoint": "http://127.0.0.1:9933",
-        "ws_events_batch_size": 1000
+        "http_rpc_endpoint": "http://127.0.0.1:9933"
     },
     "workers_config": {
         "events_workers": 10,
-        "extrinsic_workers": 10
+        "extrinsic_workers": 10,
+        "extrinsic_batch_size": 100
     },
     "chain_config": {
         "first_spec_version": 0

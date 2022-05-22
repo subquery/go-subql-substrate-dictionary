@@ -8,18 +8,35 @@ import (
 	"github.com/jackc/pgx/v4"
 )
 
+const (
+	insertBufferInitialSize = 2000
+)
+
 // insertExtrinsic is called by other functions to insert a single extrinsic in the db chan
 func (repoClient *extrinsicRepoClient) insertExtrinsic(extrinsic *Extrinsic) {
 	repoClient.dbChan <- extrinsic
 }
 
-//TODO: send batches at block level and inser an entire batch of blocks
 func (repoClient *extrinsicRepoClient) startDbWorker() {
-	insertItems := make([][]interface{}, repoClient.batchSize)
+	insertItems := make([][]interface{}, insertBufferInitialSize)
+	workerCounter := 0
 	counter := 0
 
 	for extrinsic := range repoClient.dbChan {
-		insertItems[counter] = []interface{}{
+		if extrinsic == nil {
+			workerCounter++
+			// if all workers finished the current batch processing, insert in db
+			if workerCounter == repoClient.workersCount {
+				repoClient.insertBatch(insertItems[:counter])
+				counter = 0
+				workerCounter = 0
+				repoClient.batchFinishedChan <- struct{}{} // send batch inserted signal
+				continue
+			}
+			continue
+		}
+
+		toBeInsertedExtrinsic := []interface{}{
 			extrinsic.Id,
 			extrinsic.TxHash,
 			extrinsic.Module,
@@ -28,11 +45,13 @@ func (repoClient *extrinsicRepoClient) startDbWorker() {
 			extrinsic.Success,
 			extrinsic.IsSigned,
 		}
-		counter++
-		if counter == repoClient.batchSize {
-			repoClient.insertBatch(insertItems)
-			counter = 0
+
+		if counter < cap(insertItems) {
+			insertItems[counter] = toBeInsertedExtrinsic
+		} else {
+			insertItems = append(insertItems, toBeInsertedExtrinsic)
 		}
+		counter++
 	}
 }
 
