@@ -31,7 +31,6 @@ func (repoClient *extrinsicRepoClient) startDbWorker() {
 				counter = 0
 				workerCounter = 0
 				repoClient.batchFinishedChan <- struct{}{} // send batch inserted signal
-				continue
 			}
 			continue
 		}
@@ -46,7 +45,7 @@ func (repoClient *extrinsicRepoClient) startDbWorker() {
 			extrinsic.IsSigned,
 		}
 
-		if counter < cap(insertItems) {
+		if counter < len(insertItems) {
 			insertItems[counter] = toBeInsertedExtrinsic
 		} else {
 			insertItems = append(insertItems, toBeInsertedExtrinsic)
