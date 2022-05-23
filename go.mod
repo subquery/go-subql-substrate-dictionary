@@ -2,6 +2,8 @@ module go-dictionary
 
 go 1.18
 
+replace github.com/itering/scale.go => /tmp/scale.go
+
 require (
 	github.com/golang-migrate/migrate/v4 v4.15.1
 	github.com/gorilla/websocket v1.5.0

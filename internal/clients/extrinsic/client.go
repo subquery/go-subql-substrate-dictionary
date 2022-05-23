@@ -168,7 +168,6 @@ func (client *ExtrinsicClient) startWorker() {
 			}
 
 			for idx, decodedExtrinsic := range decodedExtrinsics {
-				// fmt.Println(decodedExtrinsic) //dbg
 				extrinsicModel := Extrinsic{
 					Id:          fmt.Sprintf("%d-%d", job.BlockHeight, idx),
 					Module:      getCallModule(job.BlockHeight, decodedExtrinsic),

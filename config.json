@@ -8,8 +8,8 @@
     },
     "workers_config": {
         "events_workers": 10,
-        "extrinsic_workers": 10,
-        "extrinsic_batch_size": 1000
+        "extrinsic_workers": 30,
+        "extrinsic_batch_size": 10000
     },
     "chain_config": {
         "first_spec_version": 0

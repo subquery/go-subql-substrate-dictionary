@@ -7,6 +7,11 @@ import (
 	"go-dictionary/internal/config"
 	"go-dictionary/internal/db/postgres"
 	"go-dictionary/internal/db/rocksdb"
+	"io/ioutil"
+	"log"
+
+	"github.com/itering/scale.go/source"
+	"github.com/itering/scale.go/types"
 )
 
 type (
@@ -76,6 +81,14 @@ func NewOrchestrator(
 		dictionaryMessage.ConsoleLog()
 		panic(nil)
 	}
+
+	// Register custom types
+	c, err := ioutil.ReadFile("./network/polkadot.json")
+	if err != nil {
+		log.Println("[ERR] Failed to register types for network Polkadot:", err)
+		return nil
+	}
+	types.RegCustomTypes(source.LoadTypeRegistry(c))
 
 	// EXTRINSIC - extrinsic client
 	extrinsicClient := extrinsic.NewExtrinsicClient(
