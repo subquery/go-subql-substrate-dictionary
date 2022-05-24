@@ -60,15 +60,8 @@ create table evm_transactions (
 );
 
 create table _metadata (
-	lastProcessedHeight numeric not null,
-	lastProcessedTimestamp date not null,
-	targetHeight numeric not null,
-	chain text not null,
-	specName text not null,
-	genesisHash text not null,
-	indexerHealthy boolean not null,
-	indexerNodeVersion text not null,
-	queryNodeVersion text not null,
-	rowCountEstimate TableEstimate not null,
-	dynamicDatasources text not null
+	key varchar(255) not null primary key,
+	value jsonb,
+	"createdAt" timestamp with time zone not null,
+	"updatedAt" timestamp with time zone not null
 );

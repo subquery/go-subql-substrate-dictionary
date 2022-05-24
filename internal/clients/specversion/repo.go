@@ -31,7 +31,7 @@ func (client *specvRepoClient) getLastSolvedBlockAndSpecVersion() (*SpecVersionR
 		QueryRow(context.Background(), query).
 		Scan(
 			&specV.SpecVersion,
-			&specV.Last,
+			&specV.First,
 		)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -65,8 +65,9 @@ func (client *specvRepoClient) getAllSpecVersionData() (SpecVersionRangeList, *m
 	)
 
 	query := fmt.Sprintf(
-		"SELECT * FROM %s",
+		"SELECT * FROM %s ORDER BY %s ASC",
 		tableSpecVersionName,
+		columnBlockHeightName,
 	)
 
 	rows, err = client.Pool.Query(context.Background(), query)
@@ -94,7 +95,7 @@ func (client *specvRepoClient) getAllSpecVersionData() (SpecVersionRangeList, *m
 			&id,
 			&blockHeight,
 		)
-		specVData = append(specVData, SpecVersionRange{SpecVersion: id, Last: blockHeight})
+		specVData = append(specVData, SpecVersionRange{SpecVersion: id, First: blockHeight})
 	}
 
 	return specVData, nil
@@ -106,20 +107,13 @@ func (client *specvRepoClient) getAllSpecVersionData() (SpecVersionRangeList, *m
 // be sent
 func (client *specvRepoClient) insertSpecVersionsList(
 	newSpecVersions SpecVersionRangeList,
-	oldSpecVersion *SpecVersionRange) *messages.DictionaryMessage {
-
-	var firstBlock int
-	if oldSpecVersion != nil {
-		firstBlock = oldSpecVersion.Last
-	} else {
-		firstBlock = newSpecVersions[0].First
-	}
+) *messages.DictionaryMessage {
 	messages.NewDictionaryMessage(
 		messages.LOG_LEVEL_INFO,
 		"",
 		nil,
 		messages.SPEC_VERSION_DB_INSERT,
-		firstBlock,
+		newSpecVersions[0].First,
 	).ConsoleLog()
 
 	tx, err := client.Pool.BeginTx(context.Background(), pgx.TxOptions{})
@@ -133,38 +127,11 @@ func (client *specvRepoClient) insertSpecVersionsList(
 	}
 	defer tx.Rollback(context.Background())
 
-	toBeInserted := newSpecVersions
-
-	if oldSpecVersion != nil && newSpecVersions[0].SpecVersion == oldSpecVersion.SpecVersion {
-		updateOldQuery := fmt.Sprintf(
-			"UPDATE %s SET %s=$1 WHERE %s=$2",
-			tableSpecVersionName,
-			columnBlockHeightName,
-			columnIdName,
-		)
-
-		_, err = tx.Exec(
-			context.Background(),
-			updateOldQuery,
-			newSpecVersions[0].Last,
-			newSpecVersions[0].SpecVersion,
-		)
-		if err != nil {
-			return messages.NewDictionaryMessage(
-				messages.LOG_LEVEL_ERROR,
-				messages.GetComponent(client.insertSpecVersionsList),
-				err,
-				messages.POSTGRES_FAILED_TO_EXECUTE_UPDATE,
-			)
-		}
-		toBeInserted = toBeInserted[1:]
-	}
-
 	insertRows := [][]interface{}{}
-	for _, svModel := range toBeInserted {
+	for _, svModel := range newSpecVersions {
 		insertRows = append(insertRows, []interface{}{
 			svModel.SpecVersion,
-			svModel.Last,
+			svModel.First,
 		})
 	}
 

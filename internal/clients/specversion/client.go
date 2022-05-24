@@ -28,6 +28,10 @@ type (
 	}
 )
 
+const (
+	firstChainBlock = 1
+)
+
 var (
 	SPEC_VERSION_MESSAGE = `{"id":1,"method":"chain_getRuntimeVersion","params":["%s"],"jsonrpc":"2.0"}`
 )
@@ -56,36 +60,45 @@ func (specVClient *SpecVersionClient) Run() (SpecVersionRangeList, *messages.Dic
 		currentSpecVersion       int // the currently searched spec version
 		lastSavedDbBlockInfo     *SpecVersionRange
 		err                      error
-		dbSpecVersions           SpecVersionRangeList
+		isDataInDb               bool
 	)
 	specList := SpecVersionRangeList{}
+	insertPosition := 0
+	shouldInsert := false
 
-	lastSavedDbBlockInfo, msg = specVClient.recoverLastBlock(fmt.Sprintf("%d", specVClient.startingBlockSpecVersion))
+	lastSavedDbBlockInfo, isDataInDb, msg = specVClient.recoverLastBlock(fmt.Sprintf("%d", specVClient.startingBlockSpecVersion))
 	if msg != nil {
 		return specList, msg
 	}
 
 	// if there are spec versions in db get all of them
-	if lastSavedDbBlockInfo.Last != 0 {
-		dbSpecVersions, msg = specVClient.getAllDbSpecVersions()
+	if isDataInDb {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_INFO,
+			"",
+			nil,
+			messages.SPEC_VERSION_RECOVERED,
+		).ConsoleLog()
+		specList, msg = specVClient.getAllDbSpecVersions()
+		specList.FillLast(specVClient.lastBlock)
+		insertPosition = len(specList)
 		if msg != nil {
 			return specList, msg
 		}
 	}
 
 	// if last block in db is equal to last block indexed by node, simply return the info about the blocks in db
-	if lastSavedDbBlockInfo.Last == specVClient.lastBlock {
+	if lastSavedDbBlockInfo.First == specVClient.lastBlock {
 		messages.NewDictionaryMessage(
 			messages.LOG_LEVEL_INFO,
 			"",
 			nil,
 			messages.SPEC_VERSION_UP_TO_DATE,
 		).ConsoleLog()
-		dbSpecVersions.FillFirst()
-		return dbSpecVersions, nil
+		return specList, nil
 	}
 
-	start = lastSavedDbBlockInfo.Last - 1 // start getting spec version info from last block saved in db (0 if none in db)
+	start = lastSavedDbBlockInfo.First // start getting spec version info from the first block of the last range saved in db
 	lastBlockForCurrentRange = start
 	currentSpecVersion, err = strconv.Atoi(lastSavedDbBlockInfo.SpecVersion)
 	if err != nil {
@@ -108,17 +121,30 @@ func (specVClient *SpecVersionClient) Run() (SpecVersionRangeList, *messages.Dic
 		} else {
 			actualLastBlock = lastBlockForCurrentRange
 		}
-		specList = append(specList, SpecVersionRange{
-			Last:        actualLastBlock,
-			SpecVersion: fmt.Sprintf("%d", currentSpecVersion),
-		})
+
+		currentSpecVersionString := fmt.Sprintf("%d", currentSpecVersion)
+		if len(specList) == 0 || specList[len(specList)-1].SpecVersion != currentSpecVersionString {
+			first := firstChainBlock
+			if len(specList) != 0 {
+				first = specList[len(specList)-1].Last + 1
+			}
+			specList = append(specList, SpecVersionRange{
+				Last:        actualLastBlock,
+				First:       first,
+				SpecVersion: currentSpecVersionString,
+			})
+			shouldInsert = true
+		} else {
+			specList[len(specList)-1].Last = actualLastBlock
+		}
+
 		messages.NewDictionaryMessage(
 			messages.LOG_LEVEL_INFO,
 			"",
 			nil,
 			messages.SPEC_VERSION_RETRIEVED,
 			currentSpecVersion,
-			lastBlockForCurrentRange,
+			actualLastBlock,
 		).ConsoleLog()
 
 		if lastBlockForCurrentRange != specVClient.lastBlock {
@@ -130,33 +156,13 @@ func (specVClient *SpecVersionClient) Run() (SpecVersionRangeList, *messages.Dic
 		}
 	}
 
-	// if starting block is 0 (no specv info in db), start from beginning and save all blocks in db at the end
-	if lastSavedDbBlockInfo.Last == 0 {
-		msg = specVClient.pgClient.insertSpecVersionsList(specList, nil)
+	if shouldInsert {
+		msg = specVClient.pgClient.insertSpecVersionsList(specList[insertPosition:])
 		if msg != nil {
 			return specList, msg
 		}
 	}
 
-	//if start block is between 0 and last node block, fill the data between it and the last node, at the end
-	// update the last block info and save the rest of them
-	if lastSavedDbBlockInfo.Last > 0 && lastSavedDbBlockInfo.Last < specVClient.lastBlock {
-		messages.NewDictionaryMessage(
-			messages.LOG_LEVEL_INFO,
-			"",
-			nil,
-			messages.SPEC_VERSION_RECOVERED,
-		).ConsoleLog()
-		msg = specVClient.pgClient.insertSpecVersionsList(specList, lastSavedDbBlockInfo)
-		if msg != nil {
-			return specList, msg
-		}
-
-		dbSpecVersions[len(dbSpecVersions)-1].Last = specList[0].Last
-		specList = append(dbSpecVersions, specList[1:]...)
-	}
-
-	specList.FillFirst()
 	return specList, nil
 }
 
@@ -252,33 +258,31 @@ func (specVClient *SpecVersionClient) getLastBlockForSpecVersion(specVersion, st
 }
 
 // recoverLastBlock tries to recover the last block spec version saved in db
-func (specVClient *SpecVersionClient) recoverLastBlock(firstSpecVersion string) (*SpecVersionRange, *messages.DictionaryMessage) {
+func (specVClient *SpecVersionClient) recoverLastBlock(firstSpecVersion string) (*SpecVersionRange, bool, *messages.DictionaryMessage) {
 	var (
 		lastBlockSavedInDb *SpecVersionRange
 		msg                *messages.DictionaryMessage
 	)
 
 	lastBlockSavedInDb, msg = specVClient.pgClient.getLastSolvedBlockAndSpecVersion()
-
 	if msg != nil {
 		if msg.LogLevel == messages.LOG_LEVEL_ERROR {
-			return nil, msg
+			return nil, false, msg
 		}
 
 		// if no block spec version info was found in db, start form the beginning of the chain
 		if msg.LogLevel == messages.LOG_LEVEL_INFO {
 			msg.ConsoleLog()
-			return &SpecVersionRange{SpecVersion: firstSpecVersion, Last: 0}, nil
+			return &SpecVersionRange{SpecVersion: firstSpecVersion, First: firstChainBlock}, false, nil
 		}
 	}
 
-	return lastBlockSavedInDb, nil
+	return lastBlockSavedInDb, true, nil
 }
 
 // getAllDbSpecVersions retrieves all blocks specversions from db
 func (specVClient *SpecVersionClient) getAllDbSpecVersions() (SpecVersionRangeList, *messages.DictionaryMessage) {
 	specVersions, msg := specVClient.pgClient.getAllSpecVersionData()
-
 	if msg != nil {
 		if msg.LogLevel == messages.LOG_LEVEL_ERROR {
 			return nil, msg

@@ -12,26 +12,20 @@ type (
 	SpecVersionRangeList []SpecVersionRange
 )
 
-// FillFirst fills the first block height for each spec version range
-func (specVersionRangeList SpecVersionRangeList) FillFirst() {
-	for idx := 1; idx < len(specVersionRangeList); idx++ {
-		specVersionRangeList[idx].First = specVersionRangeList[idx-1].Last + 1
+// FillLast fills the last block height for each spec version range
+func (specVersionRangeList SpecVersionRangeList) FillLast(lastIndexedBlock int) {
+	listLen := len(specVersionRangeList)
+	for idx := 0; idx < listLen-1; idx++ {
+		specVersionRangeList[idx].Last = specVersionRangeList[idx+1].First - 1
 	}
+	specVersionRangeList[listLen-1].Last = lastIndexedBlock
 }
 
 // GetSpecVersionForBlock receives a block height and returns it's spec version
 func (specVersionRangeList SpecVersionRangeList) GetSpecVersionForBlock(blockHeight int) int {
-	if blockHeight == 0 {
-		return 0 //TODO: return first spec version for the chain
-	}
 	for idx, spec := range specVersionRangeList {
-		if blockHeight == spec.First {
+		if blockHeight >= spec.First && blockHeight <= spec.Last {
 			specVNumber, _ := strconv.Atoi(specVersionRangeList[idx-1].SpecVersion)
-			return specVNumber
-		}
-		//check only last version as the spec versions are in ascending order
-		if blockHeight <= spec.Last {
-			specVNumber, _ := strconv.Atoi(spec.SpecVersion)
 			return specVNumber
 		}
 	}
