@@ -116,7 +116,9 @@ func (rc *RockClient) GetBodyForBlockLookupKey(key []byte) ([]byte, *messages.Di
 	}
 	defer body.Free()
 	data := body.Data()
-	return data, nil
+	returnedData := make([]byte, len(data))
+	copy(returnedData, data)
+	return returnedData, nil
 }
 
 // GetLastBlockSynced gets the last synced block from the rocksdb database
