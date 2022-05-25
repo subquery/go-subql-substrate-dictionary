@@ -117,7 +117,7 @@ func (orchestrator *Orchestrator) Run() {
 	var batchChannel *extrinsic.ExtrinsicBatchChannel
 	batchChannel = orchestrator.extrinsicClient.StartBatch()
 
-	for blockHeight := 0; blockHeight <= orchestrator.lastBlock; blockHeight++ {
+	for blockHeight := 1; blockHeight <= orchestrator.lastBlock; blockHeight++ {
 		if blockHeight%orchestrator.configuration.WorkersConfig.ExtrinsicBatchSize == 0 && blockHeight != 0 {
 			batchChannel.Close()
 			orchestrator.extrinsicClient.WaitForBatch()

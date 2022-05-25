@@ -9,8 +9,9 @@ import (
 	"go-dictionary/internal/messages"
 	"strings"
 
+	scale "github.com/itering/scale.go"
 	"github.com/itering/scale.go/types"
-	"github.com/itering/substrate-api-rpc"
+	"github.com/itering/substrate-api-rpc/util"
 )
 
 type (
@@ -113,6 +114,8 @@ func (extrinsicBatchChan *ExtrinsicBatchChannel) SendWork(blockHeight int, looku
 
 func (client *ExtrinsicClient) startWorker() {
 	bodyDecoder := types.ScaleDecoder{}
+	extrinsicDecoder := scale.ExtrinsicDecoder{}
+	extrinsicDecoderOption := types.ScaleDecoderOption{Metadata: nil, Spec: -1}
 
 	for jobChan := range client.batchChan {
 		for job := range jobChan {
@@ -137,8 +140,16 @@ func (client *ExtrinsicClient) startWorker() {
 				panic(nil)
 			}
 
-			rawExtrinsicList := []string{}
-			for _, bodyInterface := range bodyList {
+			specVersion := client.specVersions.GetSpecVersionForBlock(job.BlockHeight)
+			metadataInstant := client.specVersionMetadataMap[fmt.Sprintf("%d", specVersion)].MetaInstant
+
+			if extrinsicDecoderOption.Spec == -1 || extrinsicDecoderOption.Spec != specVersion {
+				m := types.MetadataStruct(*metadataInstant)
+				extrinsicDecoderOption.Metadata = &m
+				extrinsicDecoderOption.Spec = specVersion
+			}
+
+			for idx, bodyInterface := range bodyList {
 				rawExtrinsic, ok := bodyInterface.(string)
 				if !ok {
 					messages.NewDictionaryMessage(
@@ -149,25 +160,12 @@ func (client *ExtrinsicClient) startWorker() {
 					).ConsoleLog()
 					panic(nil)
 				}
-				rawExtrinsicList = append(rawExtrinsicList, rawExtrinsic)
-			}
 
-			specVersion := client.specVersions.GetSpecVersionForBlock(job.BlockHeight)
-			metadataInstant := client.specVersionMetadataMap[fmt.Sprintf("%d", specVersion)].MetaInstant
+				//TODO: "init" with options only if the spec version is new
+				extrinsicDecoder.Init(types.ScaleBytes{Data: util.HexToBytes(rawExtrinsic)}, &extrinsicDecoderOption)
+				extrinsicDecoder.Process()
 
-			decodedExtrinsics, err := substrate.DecodeExtrinsic(rawExtrinsicList, metadataInstant, specVersion)
-			if err != nil {
-				messages.NewDictionaryMessage(
-					messages.LOG_LEVEL_ERROR,
-					messages.GetComponent(client.startWorker),
-					err,
-					messages.EXTRINSIC_DECODE_FAILED,
-					job.BlockHeight,
-				).ConsoleLog()
-				panic(nil)
-			}
-
-			for idx, decodedExtrinsic := range decodedExtrinsics {
+				decodedExtrinsic := extrinsicDecoder.Value.(map[string]interface{})
 				extrinsicModel := Extrinsic{
 					Id:          fmt.Sprintf("%d-%d", job.BlockHeight, idx),
 					Module:      getCallModule(job.BlockHeight, decodedExtrinsic),

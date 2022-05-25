@@ -25,7 +25,7 @@ func (specVersionRangeList SpecVersionRangeList) FillLast(lastIndexedBlock int) 
 func (specVersionRangeList SpecVersionRangeList) GetSpecVersionForBlock(blockHeight int) int {
 	for idx, spec := range specVersionRangeList {
 		if blockHeight >= spec.First && blockHeight <= spec.Last {
-			specVNumber, _ := strconv.Atoi(specVersionRangeList[idx-1].SpecVersion)
+			specVNumber, _ := strconv.Atoi(specVersionRangeList[idx].SpecVersion)
 			return specVNumber
 		}
 	}

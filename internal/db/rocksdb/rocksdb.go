@@ -114,7 +114,9 @@ func (rc *RockClient) GetBodyForBlockLookupKey(key []byte) ([]byte, *messages.Di
 			messages.ROCKSDB_FAILED_BODY,
 		)
 	}
-	return body.Data(), nil
+	defer body.Free()
+	data := body.Data()
+	return data, nil
 }
 
 // GetLastBlockSynced gets the last synced block from the rocksdb database
@@ -128,6 +130,7 @@ func (rc *RockClient) GetLastBlockSynced() (int, *messages.DictionaryMessage) {
 			messages.ROCKSDB_FAILED_TO_GET_LAST_SYNCED_BLOCK,
 		)
 	}
+	defer lastElement.Free()
 
 	hexIndex := hex.EncodeToString(lastElement.Data()[0:4])
 	maxBlockHeight, err := strconv.ParseInt(hexIndex, 16, 64)
