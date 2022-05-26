@@ -115,9 +115,8 @@ func (rc *RockClient) GetBodyForBlockLookupKey(key []byte) ([]byte, *messages.Di
 		)
 	}
 	defer body.Free()
-	data := body.Data()
-	returnedData := make([]byte, len(data))
-	copy(returnedData, data)
+	returnedData := []byte{}
+	returnedData = append(returnedData, body.Data()...)
 	return returnedData, nil
 }
 

@@ -7,6 +7,7 @@ import (
 	"go-dictionary/internal/config"
 	"go-dictionary/internal/db/postgres"
 	"go-dictionary/internal/db/rocksdb"
+	"go-dictionary/internal/messages"
 	"io/ioutil"
 	"log"
 
@@ -83,6 +84,7 @@ func NewOrchestrator(
 	}
 
 	// Register custom types
+	//TODO: file path from config file
 	c, err := ioutil.ReadFile("./network/polkadot.json")
 	if err != nil {
 		log.Println("[ERR] Failed to register types for network Polkadot:", err)
@@ -114,14 +116,49 @@ func NewOrchestrator(
 }
 
 func (orchestrator *Orchestrator) Run() {
+	messages.NewDictionaryMessage(
+		messages.LOG_LEVEL_INFO,
+		"",
+		nil,
+		messages.ORCHESTRATOR_START,
+	).ConsoleLog()
+
 	var batchChannel *extrinsic.ExtrinsicBatchChannel
 	batchChannel = orchestrator.extrinsicClient.StartBatch()
 
-	for blockHeight := 1; blockHeight <= orchestrator.lastBlock; blockHeight++ {
-		if blockHeight%orchestrator.configuration.WorkersConfig.ExtrinsicBatchSize == 0 && blockHeight != 0 {
+	startingBlock := orchestrator.extrinsicClient.RecoverLastInsertedBlock()
+
+	messages.NewDictionaryMessage(
+		messages.LOG_LEVEL_INFO,
+		"",
+		nil,
+		messages.ORCHESTRATOR_START_EXTRINSIC_BATCH,
+		orchestrator.configuration.WorkersConfig.ExtrinsicBatchSize,
+		startingBlock,
+	).ConsoleLog()
+
+	for blockHeight := startingBlock; blockHeight <= orchestrator.lastBlock; blockHeight++ {
+		if blockHeight%orchestrator.configuration.WorkersConfig.ExtrinsicBatchSize == 0 {
 			batchChannel.Close()
-			orchestrator.extrinsicClient.WaitForBatch()
+			orchestrator.extrinsicClient.WaitForBatchDbInsertion()
+
+			messages.NewDictionaryMessage(
+				messages.LOG_LEVEL_SUCCESS,
+				"",
+				nil,
+				messages.ORCHESTRATOR_FINISH_EXTRINSIC_BATCH,
+			).ConsoleLog()
+
 			batchChannel = orchestrator.extrinsicClient.StartBatch()
+
+			messages.NewDictionaryMessage(
+				messages.LOG_LEVEL_INFO,
+				"",
+				nil,
+				messages.ORCHESTRATOR_START_EXTRINSIC_BATCH,
+				orchestrator.configuration.WorkersConfig.ExtrinsicBatchSize,
+				blockHeight,
+			).ConsoleLog()
 		}
 
 		lookupKey, msg := orchestrator.rdbClient.GetLookupKeyForBlockHeight(blockHeight)
@@ -132,9 +169,20 @@ func (orchestrator *Orchestrator) Run() {
 
 		batchChannel.SendWork(blockHeight, lookupKey)
 	}
+
+	//TODO: show some messages
+	batchChannel.Close()
+	orchestrator.extrinsicClient.WaitForBatchDbInsertion()
 }
 
 func (orchestrator *Orchestrator) Close() {
+	messages.NewDictionaryMessage(
+		messages.LOG_LEVEL_INFO,
+		"",
+		nil,
+		messages.ORCHESTRATOR_CLOSE,
+	).ConsoleLog()
+
 	orchestrator.rdbClient.Close()
 	orchestrator.pgClient.Close()
 }

@@ -10,6 +10,14 @@ import (
 
 const (
 	insertBufferInitialSize = 2000
+	tableExtrinsicName      = "extrinsics"
+	colId                   = "id"
+	colTxHash               = "tx_hash"
+	colModule               = "module"
+	colCall                 = "call"
+	colBlockHeight          = "block_height"
+	colSuccess              = "success"
+	colIsSigned             = "is_signed"
 )
 
 // insertExtrinsic is called by other functions to insert a single extrinsic in the db chan
@@ -70,15 +78,15 @@ func (repoClient *extrinsicRepoClient) insertBatch(batch [][]interface{}) {
 
 	copyLen, err := tx.CopyFrom(
 		context.Background(),
-		pgx.Identifier{"extrinsics"},
+		pgx.Identifier{tableExtrinsicName},
 		[]string{
-			"id",
-			"tx_hash",
-			"module",
-			"call",
-			"block_height",
-			"success",
-			"is_signed",
+			colId,
+			colTxHash,
+			colModule,
+			colCall,
+			colBlockHeight,
+			colSuccess,
+			colIsSigned,
 		},
 		pgx.CopyFromRows(batch),
 	)
@@ -111,4 +119,35 @@ func (repoClient *extrinsicRepoClient) insertBatch(batch [][]interface{}) {
 		).ConsoleLog()
 		panic(nil)
 	}
+}
+
+func (repoClient *extrinsicRepoClient) recoverLastBlock() int {
+	var blockHeight int
+
+	query := fmt.Sprintf(
+		"SELECT %s FROM %s ORDER BY %s DESC LIMIT 1",
+		colBlockHeight,
+		tableExtrinsicName,
+		colBlockHeight,
+	)
+
+	err := repoClient.Pool.
+		QueryRow(context.Background(), query).
+		Scan(&blockHeight)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return -1
+		}
+
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(repoClient.recoverLastBlock),
+			err,
+			messages.EXTRINSIC_FAILED_TO_RETRIEVE_LAST_BLOCK,
+		).ConsoleLog()
+		panic(nil)
+	}
+
+	return blockHeight
 }

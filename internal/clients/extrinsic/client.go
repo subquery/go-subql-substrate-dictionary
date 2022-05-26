@@ -69,6 +69,14 @@ func NewExtrinsicClient(
 
 // Run starts the extrinsics worker
 func (client *ExtrinsicClient) Run() {
+	messages.NewDictionaryMessage(
+		messages.LOG_LEVEL_INFO,
+		"",
+		nil,
+		messages.EXTRINSIC_CLIENT_STARTING,
+		client.workersCount,
+	).ConsoleLog()
+
 	go client.pgClient.startDbWorker()
 
 	count := 0
@@ -96,8 +104,24 @@ func (client *ExtrinsicClient) StartBatch() *ExtrinsicBatchChannel {
 }
 
 // WaitForBatch blocks, waiting for the current batch to finish
-func (client *ExtrinsicClient) WaitForBatch() {
+func (client *ExtrinsicClient) WaitForBatchDbInsertion() {
 	<-client.pgClient.batchFinishedChan
+}
+
+// RecoverLastInsertedBlock recovers the last inserted block in db
+func (client *ExtrinsicClient) RecoverLastInsertedBlock() int {
+	lastBlock := client.pgClient.recoverLastBlock()
+	if lastBlock < 0 {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_INFO,
+			"",
+			nil,
+			messages.EXTRINSICS_NO_PREVIOUS_WORK,
+		).ConsoleLog()
+		return 1 //TODO: use first block from config file
+	}
+
+	return lastBlock + 1
 }
 
 func (extrinsicBatchChan *ExtrinsicBatchChannel) Close() {
@@ -141,11 +165,10 @@ func (client *ExtrinsicClient) startWorker() {
 			}
 
 			specVersion := client.specVersions.GetSpecVersionForBlock(job.BlockHeight)
-			metadataInstant := client.specVersionMetadataMap[fmt.Sprintf("%d", specVersion)].MetaInstant
+			metadata := client.specVersionMetadataMap[fmt.Sprintf("%d", specVersion)].Meta
 
 			if extrinsicDecoderOption.Spec == -1 || extrinsicDecoderOption.Spec != specVersion {
-				m := types.MetadataStruct(*metadataInstant)
-				extrinsicDecoderOption.Metadata = &m
+				extrinsicDecoderOption.Metadata = metadata
 				extrinsicDecoderOption.Spec = specVersion
 			}
 
