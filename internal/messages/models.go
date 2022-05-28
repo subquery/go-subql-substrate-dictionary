@@ -71,6 +71,9 @@ var (
 	EXTRINSICS_NO_PREVIOUS_WORK             = "No previous extrinsic indexing was made"
 	EXTRINSIC_FAILED_TO_RETRIEVE_LAST_BLOCK = "Failed to retrieve last block from previous indexing"
 
+	// event
+	EVENT_FAILED_TRIE_NODE_DB = "Failed to get trie node from rocksdb"
+
 	// orchestrator
 	ORCHESTRATOR_START                  = "Starting client orchestrator"
 	ORCHESTRATOR_CLOSE                  = "Closing client orchestrator"

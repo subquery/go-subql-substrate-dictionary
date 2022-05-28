@@ -76,7 +76,12 @@ func OpenRocksdb(path, secondaryPath string) (*RockClient, *messages.DictionaryM
 		)
 	}
 
-	messages.NewDictionaryMessage(messages.LOG_LEVEL_SUCCESS, "", nil, messages.ROCKSDB_CONNECTED).ConsoleLog()
+	messages.NewDictionaryMessage(
+		messages.LOG_LEVEL_SUCCESS,
+		"",
+		nil,
+		messages.ROCKSDB_CONNECTED,
+	).ConsoleLog()
 	return &RockClient{
 		db,
 		handles,
@@ -85,16 +90,26 @@ func OpenRocksdb(path, secondaryPath string) (*RockClient, *messages.DictionaryM
 	}, nil
 }
 
+// GetLookupKeyForBlockHeight returns the rocksdb lookup key for a given block height
 func (rc *RockClient) GetLookupKeyForBlockHeight(blockHeight int) ([]byte, *messages.DictionaryMessage) {
-	blockKey := BlockHeightToKey(blockHeight)
+	blockKey := blockHeightToKey(blockHeight)
 	response, err := rc.db.GetCF(rc.ro, rc.columnHandles[COL_KEY_LOOKUP], blockKey)
 	if err != nil {
-		return []byte{}, messages.NewDictionaryMessage(messages.LOG_LEVEL_ERROR, messages.GetComponent(rc.GetLookupKeyForBlockHeight), err, messages.ROCKSDB_FAILED_LOOKUP_KEY, blockHeight)
+		return []byte{}, messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(rc.GetLookupKeyForBlockHeight),
+			err,
+			messages.ROCKSDB_FAILED_LOOKUP_KEY,
+			blockHeight,
+		)
 	}
-	return response.Data(), nil
+	defer response.Free()
+	returnedData := []byte{}
+	returnedData = append(returnedData, response.Data()...)
+	return returnedData, nil
 }
 
-func BlockHeightToKey(blockHeight int) []byte {
+func blockHeightToKey(blockHeight int) []byte {
 	return []byte{
 		byte(blockHeight >> 24),
 		byte((blockHeight >> 16) & 0xff),
@@ -153,6 +168,23 @@ func (rc *RockClient) GetBlockHash(height int) (string, *messages.DictionaryMess
 	}
 	hash := hex.EncodeToString(lk[4:])
 	return hash, nil
+}
+
+// GetStateTrieNode returns a trie node from rocksdb being given a key
+func (rc *RockClient) GetStateTrieNode(stateLookupKey []byte) ([]byte, *messages.DictionaryMessage) {
+	trieNode, err := rc.db.GetCF(rc.ro, rc.columnHandles[COL_STATE], stateLookupKey)
+	if err != nil {
+		return []byte{}, messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(rc.GetStateTrieNode),
+			err,
+			messages.EVENT_FAILED_TRIE_NODE_DB,
+		)
+	}
+	defer trieNode.Free()
+	returnedData := []byte{}
+	returnedData = append(returnedData, trieNode.Data()...)
+	return returnedData, nil
 }
 
 func (rc *RockClient) Close() {

@@ -31,5 +31,6 @@ func main() {
 	orchestrator := clients.NewOrchestrator(dictionaryConfiguration)
 	defer orchestrator.Close()
 
-	orchestrator.Run()
+	orchestrator.ReadEvent()
+	// orchestrator.Run()
 }
