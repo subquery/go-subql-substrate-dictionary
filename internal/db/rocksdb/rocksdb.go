@@ -8,9 +8,6 @@ import (
 	"github.com/linxGnu/grocksdb"
 )
 
-const polkaAddressPrefix = "00"
-const SS58PRE = "53533538505245"
-
 const (
 	/// Metadata about chain
 	COL_META = iota + 1
@@ -185,6 +182,25 @@ func (rc *RockClient) GetStateTrieNode(stateLookupKey []byte) ([]byte, *messages
 	returnedData := []byte{}
 	returnedData = append(returnedData, trieNode.Data()...)
 	return returnedData, nil
+}
+
+// GetHeaderForBlockLookupKey retrieves the block header from rocksdb
+func (rc *RockClient) GetHeaderForBlockLookupKey(key []byte) ([]byte, *messages.DictionaryMessage) {
+	header, err := rc.db.GetCF(rc.ro, rc.columnHandles[COL_HEADER], key)
+	if err != nil {
+		return nil, messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(rc.GetHeaderForBlockLookupKey),
+			err,
+			messages.ROCKSDB_FAILED_HEADER,
+		)
+	}
+	defer header.Free()
+
+	returnedHeader := []byte{}
+	returnedHeader = append(returnedHeader, header.Data()...)
+
+	return returnedHeader, nil
 }
 
 func (rc *RockClient) Close() {

@@ -32,6 +32,7 @@ var (
 	ROCKSDB_CONNECTED                       = "Successfully connected to rocksdb instance"
 	ROCKSDB_FAILED_TO_GET_LAST_SYNCED_BLOCK = "Failed to get last synced block"
 	ROCKSDB_FAILED_BODY                     = "Failed to retrieve block body from rocksdb"
+	ROCKSDB_FAILED_HEADER                   = "Failed to retrieve block header from rocksdb"
 
 	// postgres
 	POSTGRES_CONNECTING                        = "Connecting to postgres database using '%s'"
@@ -72,7 +73,9 @@ var (
 	EXTRINSIC_FAILED_TO_RETRIEVE_LAST_BLOCK = "Failed to retrieve last block from previous indexing"
 
 	// event
-	EVENT_FAILED_TRIE_NODE_DB = "Failed to get trie node from rocksdb"
+	EVENT_FAILED_TRIE_NODE_DB  = "Failed to get trie node from rocksdb"
+	EVENT_CLIENT_STARTING      = "Starting events client with %d workers"
+	EVENT_STATE_ROOT_NOT_FOUND = "State root hash was not found in the block header"
 
 	// orchestrator
 	ORCHESTRATOR_START                  = "Starting client orchestrator"
