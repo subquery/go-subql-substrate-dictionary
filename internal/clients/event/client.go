@@ -94,9 +94,10 @@ func (client *EventClient) Run() {
 		"",
 		nil,
 		messages.EVENT_CLIENT_STARTING,
+		client.workersCount,
 	).ConsoleLog()
 
-	//TODO: start db client
+	go client.pgClient.startDbWorker()
 
 	for i := 0; i < client.workersCount; i++ {
 		go client.startWorker()
@@ -168,13 +169,35 @@ func (client *EventClient) startWorker() {
 			eventDecoder.Init(types.ScaleBytes{Data: rawEvents}, &eventDecoderOption)
 			eventDecoder.Process()
 
+			eventsCounter := 0
+			extrinsicUpdatesCounter := 0
 			eventsArray := eventDecoder.Value.([]interface{})
 			for _, evt := range eventsArray {
-				fmt.Println("id:", evt.(map[string]interface{})["event_idx"].(int))
-				fmt.Println("module:", strings.ToLower(evt.(map[string]interface{})["module_id"].(string)))
-				fmt.Println("event:", evt.(map[string]interface{})["event_id"].(string))
+				evtValue := evt.(map[string]interface{})
+				eventCall := getEventCall(job.BlockHeight, evtValue)
+
+				if _, found := notInsertableEvents[eventCall]; found {
+					extrinsicUpdate := Event{
+						Id:          fmt.Sprintf("%d-%d", job.BlockHeight, extrinsicUpdatesCounter),
+						Event:       getEventCall(job.BlockHeight, evtValue),
+						BlockHeight: updateExtrinsicCommand,
+					}
+					client.pgClient.insertEvent(&extrinsicUpdate)
+					extrinsicUpdatesCounter++
+				} else {
+					eventModel := Event{
+						Id:          fmt.Sprintf("%d-%d", job.BlockHeight, eventsCounter),
+						Module:      getEventModule(job.BlockHeight, evtValue),
+						Event:       getEventCall(job.BlockHeight, evtValue),
+						BlockHeight: job.BlockHeight,
+					}
+					client.pgClient.insertEvent(&eventModel)
+					eventsCounter++
+				}
 			}
 		}
+		// send nil event when work is done
+		client.pgClient.insertEvent(nil)
 	}
 }
 
@@ -269,4 +292,53 @@ func getStateRootFromRawHeader(rawHeader interface{}) string {
 	}
 
 	return strings.TrimPrefix(stateRoot, "0x")
+}
+
+func getEventId(blockHeight int, decodedEvent map[string]interface{}) string {
+	eventId, ok := decodedEvent[eventIdField].(int)
+	if !ok {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(getEventId),
+			nil,
+			messages.EVENT_FIELD_FAILED,
+			eventIdField,
+			blockHeight,
+		).ConsoleLog()
+		panic(nil)
+	}
+
+	return fmt.Sprintf("%d-%d", blockHeight, eventId)
+}
+
+func getEventModule(blockHeight int, decodedEvent map[string]interface{}) string {
+	module, ok := decodedEvent[eventModuleField].(string)
+	if !ok {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(getEventModule),
+			nil,
+			messages.EVENT_FIELD_FAILED,
+			eventModuleField,
+			blockHeight,
+		).ConsoleLog()
+		panic(nil)
+	}
+	return strings.ToLower(module)
+}
+
+func getEventCall(blockHeight int, decodedEvent map[string]interface{}) string {
+	event, ok := decodedEvent[eventEventField].(string)
+	if !ok {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(getEventCall),
+			nil,
+			messages.EVENT_FIELD_FAILED,
+			eventEventField,
+			blockHeight,
+		).ConsoleLog()
+		panic(nil)
+	}
+	return event
 }

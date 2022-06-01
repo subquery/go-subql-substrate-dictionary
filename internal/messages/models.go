@@ -73,9 +73,11 @@ var (
 	EXTRINSIC_FAILED_TO_RETRIEVE_LAST_BLOCK = "Failed to retrieve last block from previous indexing"
 
 	// event
-	EVENT_FAILED_TRIE_NODE_DB  = "Failed to get trie node from rocksdb"
-	EVENT_CLIENT_STARTING      = "Starting events client with %d workers"
-	EVENT_STATE_ROOT_NOT_FOUND = "State root hash was not found in the block header"
+	EVENT_FAILED_TRIE_NODE_DB              = "Failed to get trie node from rocksdb"
+	EVENT_CLIENT_STARTING                  = "Starting events client with %d workers"
+	EVENT_STATE_ROOT_NOT_FOUND             = "State root hash was not found in the block header"
+	EVENT_FIELD_FAILED                     = "Failed to get event field %s for an event at block height %d"
+	EVENT_UNKNOWN_EXTRINSIC_SUCCESS_STATUS = "%s is not a valid extrinsic success status"
 
 	// orchestrator
 	ORCHESTRATOR_START                  = "Starting client orchestrator"

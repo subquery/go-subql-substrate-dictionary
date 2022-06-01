@@ -139,8 +139,8 @@ func (orchestrator *Orchestrator) Run() {
 	var extrinsicBatchChannel *extrinsic.ExtrinsicBatchChannel
 	extrinsicBatchChannel = orchestrator.extrinsicClient.StartBatch()
 
-	var eventBatchChannel *event.EventBatchChannel
-	eventBatchChannel = orchestrator.eventClient.StartBatch()
+	// var eventBatchChannel *event.EventBatchChannel
+	// eventBatchChannel = orchestrator.eventClient.StartBatch()
 
 	startingBlock := orchestrator.extrinsicClient.RecoverLastInsertedBlock()
 
@@ -183,7 +183,7 @@ func (orchestrator *Orchestrator) Run() {
 			panic(nil)
 		}
 
-		eventBatchChannel.SendWork(blockHeight, lookupKey)
+		// eventBatchChannel.SendWork(blockHeight, lookupKey)
 		extrinsicBatchChannel.SendWork(blockHeight, lookupKey)
 	}
 
