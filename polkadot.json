@@ -1,8 +1,8 @@
 {
-    "evm": true,
+    "evm": false,
     "rocksdb_config": {
-        "rocksdb_path": "/media/cxm/ssd/Moonbeam/chains/moonbeam/db/full",
-        "rocksdb_secondary_path": "/tmp/moonbeam"
+        "rocksdb_path": "/media/cxm/ssd/PolkadotArchive/chains/polkadot/db/full",
+        "rocksdb_secondary_path": "/tmp/polkadot"
     },
     "clients_config": {
         "events": {
@@ -15,9 +15,9 @@
         }
     },
     "chain_config": {
-        "first_spec_version": 900,
+        "first_spec_version": 1,
         "http_rpc_endpoint": "http://127.0.0.1:9933",
-        "decoder_types_file": "./network/moonbeam.json"
+        "decoder_types_file": "./network/polkadot.json"
     },
     "postgres_config": {
         "postgres_user": "postgres",

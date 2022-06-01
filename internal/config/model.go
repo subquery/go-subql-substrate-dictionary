@@ -10,10 +10,9 @@ type PostgresConfig struct {
 }
 
 type ChainConfig struct {
-	PolkadotFirstSpecVersion int    `json:"polkadot_first_spec_version"`
-	MoonbeamFirstSpecVersion int    `json:"moonbeam_first_spec_version"`
-	HttpRpcEndpoint          string `json:"http_rpc_endpoint"`
-	PolkadotTypesFile        string `json:"polkadot_types_file"`
+	FirstSpecVersion int    `json:"first_spec_version"`
+	HttpRpcEndpoint  string `json:"http_rpc_endpoint"`
+	DecoderTypesFile string `json:"decoder_types_file"`
 }
 
 type ClientData struct {
@@ -32,6 +31,7 @@ type RocksdbConfig struct {
 }
 
 type Config struct {
+	Evm            bool           `json:"evm"`
 	ChainConfig    ChainConfig    `json:"chain_config"`
 	RocksdbConfig  RocksdbConfig  `json:"rocksdb_config"`
 	ClientsConfig  ClientsConfig  `json:"clients_config"`
