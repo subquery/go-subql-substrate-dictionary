@@ -50,7 +50,6 @@ func (client *specvRepoClient) getLastSolvedBlockAndSpecVersion() (*SpecVersionR
 			messages.SPEC_VERSION_FAILED_DB_LAST_BLOCK,
 		)
 	}
-
 	return &specV, nil
 }
 
@@ -90,7 +89,7 @@ func (client *specvRepoClient) getAllSpecVersionData() (SpecVersionRangeList, *m
 	}
 
 	// no defer rows.Close() as Next() automatically closes them
-	for rows.Next() == true {
+	for rows.Next() {
 		rows.Scan(
 			&id,
 			&blockHeight,

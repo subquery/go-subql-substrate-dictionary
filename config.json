@@ -1,25 +1,31 @@
 {
     "rocksdb_config": {
-        "rocksdb_path": "/tmp/rocksdb-polkadot/chains/polkadot/db/full",
+        
+        "rocksdb_path": "/media/cxm/ssd/Moonbeam/chains/moonbeam/db/full",
         "rocksdb_secondary_path": "/tmp/secondary"
     },
-    "connection_config": {
-        "http_rpc_endpoint": "http://127.0.0.1:9933"
-    },
-    "workers_config": {
-        "events_workers": 10,
-        "extrinsic_workers": 50,
-        "extrinsic_batch_size": 1000
+    "clients_config": {
+        "events": {
+            "workers": 10,
+            "batch_size": 100
+        },
+        "extrinsics": {
+            "workers": 10,
+            "batch_size": 100
+        }
     },
     "chain_config": {
-        "first_spec_version": 0
+        "polkadot_first_spec_version": 1,
+        "moonbeam_first_spec_version": 900,
+        "http_rpc_endpoint": "http://127.0.0.1:9933",
+        "polkadot_types_file": "./network/polkadot.json"
     },
     "postgres_config": {
         "postgres_user": "postgres",
-        "postgres_password": "postgres",
+        "postgres_password": "password",
         "postgres_host": "localhost",
         "postgres_port": "5432",
-        "postgres_db": "rock",
+        "postgres_db": "subquery",
         "postgres_conn_pool": 20
     }
 }

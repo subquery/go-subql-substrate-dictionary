@@ -9,18 +9,21 @@ type PostgresConfig struct {
 	ConnPool int    `json:"postgres_conn_pool"`
 }
 
-type ConnectionConfig struct {
-	HttpRpcEndpoint string `json:"http_rpc_endpoint"`
-}
-
 type ChainConfig struct {
-	FirstSpecVersion int `json:"starting_spec_version"`
+	PolkadotFirstSpecVersion int    `json:"polkadot_first_spec_version"`
+	MoonbeamFirstSpecVersion int    `json:"moonbeam_first_spec_version"`
+	HttpRpcEndpoint          string `json:"http_rpc_endpoint"`
+	PolkadotTypesFile        string `json:"polkadot_types_file"`
 }
 
-type WorkersConfig struct {
-	EventsWorkers      int `json:"events_workers"`
-	ExtrinsicWorkers   int `json:"extrinsic_workers"`
-	ExtrinsicBatchSize int `json:"extrinsic_batch_size"`
+type ClientData struct {
+	Workers   int `json:"workers"`
+	BatchSize int `json:"batch_size"`
+}
+
+type ClientsConfig struct {
+	Events     ClientData `json:"events"`
+	Extrinsics ClientData `json:"extrinsics"`
 }
 
 type RocksdbConfig struct {
@@ -29,9 +32,8 @@ type RocksdbConfig struct {
 }
 
 type Config struct {
-	ConnectionConfig  ConnectionConfig `json:"connection_config"`
-	RocksdbConfig     RocksdbConfig    `json:"rocksdb_config"`
-	WorkersConfig     WorkersConfig    `json:"workers_config"`
-	SpecVersionConfig ChainConfig      `json:"chain_config"`
-	PostgresConfig    PostgresConfig   `json:"postgres_config"`
+	ChainConfig    ChainConfig    `json:"chain_config"`
+	RocksdbConfig  RocksdbConfig  `json:"rocksdb_config"`
+	ClientsConfig  ClientsConfig  `json:"clients_config"`
+	PostgresConfig PostgresConfig `json:"postgres_config"`
 }

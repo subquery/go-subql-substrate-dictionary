@@ -189,7 +189,7 @@ func (specVClient *SpecVersionClient) getSpecVersion(height int) (int, *messages
 
 	v := &rpc.JsonRpcResult{}
 	jsonDecodeErr := json.NewDecoder(resp.Body).Decode(&v)
-	if err != nil {
+	if jsonDecodeErr != nil {
 		return -1, messages.NewDictionaryMessage(
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(specVClient.getSpecVersion),

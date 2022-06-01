@@ -62,14 +62,13 @@ func NewOrchestrator(
 		dictionaryMessage.ConsoleLog()
 		panic(nil)
 	}
-
 	// SPEC VERSION -- spec version and ranges for each spec
 	specVersionClient := specversion.NewSpecVersionClient(
-		config.SpecVersionConfig.FirstSpecVersion,
+		config.ChainConfig.PolkadotFirstSpecVersion,
 		lastBlock,
 		rdbClient,
 		pgClient,
-		config.ConnectionConfig.HttpRpcEndpoint,
+		config.ChainConfig.HttpRpcEndpoint,
 	)
 
 	specVersionsRange, dictionaryMessage := specVersionClient.Run()
@@ -81,7 +80,7 @@ func NewOrchestrator(
 	// METADATA -- meta for spec version
 	metadataClient := metadata.NewMetadataClient(
 		rdbClient,
-		config.ConnectionConfig.HttpRpcEndpoint,
+		config.ChainConfig.HttpRpcEndpoint,
 	)
 
 	specVersionMetadataMap, dictionaryMessage := metadataClient.GetMetadata(specVersionsRange)
@@ -103,7 +102,7 @@ func NewOrchestrator(
 	extrinsicClient := extrinsic.NewExtrinsicClient(
 		pgClient,
 		rdbClient,
-		config.WorkersConfig.ExtrinsicWorkers,
+		config.ClientsConfig.Extrinsics.Workers,
 		specVersionsRange,
 		specVersionMetadataMap,
 	)
@@ -134,18 +133,17 @@ func (orchestrator *Orchestrator) Run() {
 	batchChannel = orchestrator.extrinsicClient.StartBatch()
 
 	startingBlock := orchestrator.extrinsicClient.RecoverLastInsertedBlock()
-
 	messages.NewDictionaryMessage(
 		messages.LOG_LEVEL_INFO,
 		"",
 		nil,
 		messages.ORCHESTRATOR_START_EXTRINSIC_BATCH,
-		orchestrator.configuration.WorkersConfig.ExtrinsicBatchSize,
+		orchestrator.configuration.ClientsConfig.Extrinsics.BatchSize,
 		startingBlock,
 	).ConsoleLog()
 
 	for blockHeight := startingBlock; blockHeight <= orchestrator.lastBlock; blockHeight++ {
-		if blockHeight%orchestrator.configuration.WorkersConfig.ExtrinsicBatchSize == 0 {
+		if blockHeight%orchestrator.configuration.ClientsConfig.Extrinsics.BatchSize == 0 {
 			batchChannel.Close()
 			orchestrator.extrinsicClient.WaitForBatchDbInsertion()
 
@@ -163,7 +161,7 @@ func (orchestrator *Orchestrator) Run() {
 				"",
 				nil,
 				messages.ORCHESTRATOR_START_EXTRINSIC_BATCH,
-				orchestrator.configuration.WorkersConfig.ExtrinsicBatchSize,
+				orchestrator.configuration.ClientsConfig.Extrinsics.BatchSize,
 				blockHeight,
 			).ConsoleLog()
 		}

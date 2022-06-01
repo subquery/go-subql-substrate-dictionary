@@ -137,7 +137,7 @@ func (rc *RockClient) GetBodyForBlockLookupKey(key []byte) ([]byte, *messages.Di
 
 // GetLastBlockSynced gets the last synced block from the rocksdb database
 func (rc *RockClient) GetLastBlockSynced() (int, *messages.DictionaryMessage) {
-	lastElement, err := rc.db.GetCF(rc.ro, rc.columnHandles[COL_META], []byte("final"))
+	lastElement, err := rc.db.GetCF(rc.ro, rc.columnHandles[COL_META], []byte("best"))
 	if err != nil {
 		return 0, messages.NewDictionaryMessage(
 			messages.LOG_LEVEL_ERROR,
