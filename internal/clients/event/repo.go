@@ -151,6 +151,37 @@ func (repoClient *eventRepoClient) insertBatch(
 	}
 }
 
+func (repoClient *eventRepoClient) recoverLastBlock() int {
+	var blockHeight int
+
+	query := fmt.Sprintf(
+		"SELECT %s FROM %s ORDER BY %s DESC LIMIT 1",
+		colBlockHeight,
+		tableEventName,
+		colBlockHeight,
+	)
+
+	err := repoClient.Pool.
+		QueryRow(context.Background(), query).
+		Scan(&blockHeight)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return -1
+		}
+
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(repoClient.recoverLastBlock),
+			err,
+			messages.EVENT_FAILED_TO_RETRIEVE_LAST_BLOCK,
+		).ConsoleLog()
+		panic(nil)
+	}
+
+	return blockHeight
+}
+
 func getExtrinsicSuccess(eventCall string) bool {
 	if eventCall == extrinsicSuccess {
 		return true

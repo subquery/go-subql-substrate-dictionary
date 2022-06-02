@@ -7,7 +7,7 @@
         "http_rpc_endpoint": "http://127.0.0.1:9933"
     },
     "workers_config": {
-        "events_workers": 10,
+        "events_workers": 350,
         "extrinsic_workers": 50,
         "extrinsic_batch_size": 1000
     },
