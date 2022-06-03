@@ -123,8 +123,17 @@ func (client *EventClient) WaitForBatchDbInsertion() {
 }
 
 func (client *EventClient) RecoverLastInsertedBlock() int {
-	//TODO: implement
-	return -1
+	lastBlock := client.pgClient.recoverLastBlock()
+	if lastBlock < 0 {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_INFO,
+			"",
+			nil,
+			messages.EVENT_NO_PREVIOUS_WORK,
+		).ConsoleLog()
+		return 1
+	}
+	return lastBlock
 }
 
 func (eventBatchChan *EventBatchChannel) Close() {
@@ -208,7 +217,9 @@ func (client *EventClient) readRawEvent(rootStateKey string) []byte {
 		panic(err)
 	}
 
+	//TODO: transform to nibble slice from start??
 	eventsPathKey := eventTriePathKey
+	//TODO: allocate prefix length from beginning
 	prefix := []byte{}
 	nibblePos := 0
 
@@ -229,12 +240,13 @@ func (client *EventClient) readRawEvent(rootStateKey string) []byte {
 			{
 				decodedBranch := decodedNode.(*trieNode.Branch)
 
-				key := decodedBranch.GetKey()
+				key := decodedBranch.Key
 				if len(key) != 0 {
 					keyNibblePos := 0
 					keyBytes := []byte{}
 					for _, keyNibble := range key {
 						prefix = insertNibble(prefix, nibblePos, keyNibble)
+						//TODO: key is equivalent to keyBytes??? :))
 						keyBytes = insertNibble(keyBytes, keyNibblePos, keyNibble)
 						nibblePos++
 						keyNibblePos++
@@ -243,7 +255,7 @@ func (client *EventClient) readRawEvent(rootStateKey string) []byte {
 				}
 
 				if len(eventsPathKey) == 0 {
-					return decodedBranch.GetValue()
+					return decodedBranch.Value
 				}
 
 				childIndex := []byte{eventsPathKey[0]}
@@ -262,7 +274,7 @@ func (client *EventClient) readRawEvent(rootStateKey string) []byte {
 		case trieNode.LeafType:
 			{
 				decodedLeaf := decodedNode.(*trieNode.Leaf)
-				return decodedLeaf.GetValue()
+				return decodedLeaf.Value
 			}
 		}
 	}

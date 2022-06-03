@@ -12,7 +12,7 @@ import (
 	"go-dictionary/internal/messages"
 	"io/ioutil"
 	"log"
-	"sync"
+	"sync/atomic"
 
 	"github.com/itering/scale.go/source"
 	"github.com/itering/scale.go/types"
@@ -30,7 +30,7 @@ type (
 		specVersionMetaMap map[string]*metadata.DictionaryMetadata
 		extrinsicClient    *extrinsic.ExtrinsicClient
 		eventClient        *event.EventClient
-		extrinsicHeight    chan int
+		extrinsicHeight    uint64
 	}
 )
 
@@ -117,8 +117,6 @@ func NewOrchestrator(
 	)
 	eventClient.Run()
 
-	extrinsicHeightChan := make(chan int, 100)
-
 	return &Orchestrator{
 		configuration:      config,
 		pgClient:           pgClient,
@@ -130,7 +128,6 @@ func NewOrchestrator(
 		specVersionMetaMap: specVersionMetadataMap,
 		extrinsicClient:    extrinsicClient,
 		eventClient:        eventClient,
-		extrinsicHeight:    extrinsicHeightChan,
 	}
 }
 
@@ -141,10 +138,6 @@ func (orchestrator *Orchestrator) Run() {
 		nil,
 		messages.ORCHESTRATOR_START,
 	).ConsoleLog()
-
-	// var wg sync.WaitGroup
-	// wg.Add(1)
-	// didn't use wg.Done() as the program is a long running job
 
 	go orchestrator.runExtrinsics()
 	go orchestrator.runEvents()
@@ -167,13 +160,13 @@ func (orchestrator *Orchestrator) runExtrinsics() {
 		startingBlock,
 	).ConsoleLog()
 
-	orchestrator.extrinsicHeight <- startingBlock - 1
+	atomic.StoreUint64(&orchestrator.extrinsicHeight, uint64(startingBlock))
 
-	for blockHeight := startingBlock; blockHeight <= orchestrator.lastBlock; blockHeight++ {
+	for blockHeight := startingBlock + 1; blockHeight <= orchestrator.lastBlock; blockHeight++ {
 		if blockHeight%orchestrator.configuration.WorkersConfig.ExtrinsicBatchSize == 0 {
 			extrinsicBatchChannel.Close()
 			orchestrator.extrinsicClient.WaitForBatchDbInsertion()
-			orchestrator.extrinsicHeight <- blockHeight - 1
+			atomic.StoreUint64(&orchestrator.extrinsicHeight, uint64(blockHeight-1))
 
 			messages.NewDictionaryMessage(
 				messages.LOG_LEVEL_SUCCESS,
@@ -210,44 +203,38 @@ func (orchestrator *Orchestrator) runExtrinsics() {
 
 func (orchestrator *Orchestrator) runEvents() {
 	eventBatchChannel := orchestrator.eventClient.StartBatch()
-	//TODO: recover lastProcessedEvent+1 from db
-	lastProcessedEvent := 0
-	heightsBuffer := make([]int, 10)
-	var mux sync.Mutex
-
-	go func() {
-		for lastProcessedExtrinsic := range orchestrator.extrinsicHeight {
-			mux.Lock()
-			heightsBuffer = append(heightsBuffer, lastProcessedExtrinsic)
-			mux.Unlock()
-		}
-	}()
+	lastProcessedEvent := orchestrator.eventClient.RecoverLastInsertedBlock()
+	var lastExtrinsicBlockHeight int
 
 	for {
-		if len(heightsBuffer) == 0 {
-			continue
-		}
+		lastExtrinsicBlockHeight = int(atomic.LoadUint64(&orchestrator.extrinsicHeight))
 
-		lastExtrinsicBlockHeight := heightsBuffer[0]
-		mux.Lock()
-		heightsBuffer = heightsBuffer[1:]
-		mux.Unlock()
+		if lastProcessedEvent < lastExtrinsicBlockHeight {
+			for blockHeight := lastProcessedEvent + 1; blockHeight <= lastExtrinsicBlockHeight; blockHeight++ {
+				//TODO: use event batch size
+				if blockHeight%orchestrator.configuration.WorkersConfig.ExtrinsicBatchSize == 0 {
+					eventBatchChannel.Close()
+					orchestrator.eventClient.WaitForBatchDbInsertion()
+					lastProcessedEvent = blockHeight - 1
+					eventBatchChannel = orchestrator.eventClient.StartBatch()
+					fmt.Println("Finished events up to block ", lastProcessedEvent) //dbg
+					continue
+				}
 
-		for blockHeight := lastProcessedEvent + 1; blockHeight <= lastExtrinsicBlockHeight; blockHeight++ {
-			lookupKey, msg := orchestrator.rdbClient.GetLookupKeyForBlockHeight(blockHeight)
-			if msg != nil {
-				msg.ConsoleLog()
-				panic(nil)
+				lookupKey, msg := orchestrator.rdbClient.GetLookupKeyForBlockHeight(blockHeight)
+				if msg != nil {
+					msg.ConsoleLog()
+					panic(nil)
+				}
+
+				eventBatchChannel.SendWork(blockHeight, lookupKey)
 			}
 
-			eventBatchChannel.SendWork(blockHeight, lookupKey)
+			eventBatchChannel.Close()
+			orchestrator.eventClient.WaitForBatchDbInsertion()
+			lastProcessedEvent = lastExtrinsicBlockHeight
+			eventBatchChannel = orchestrator.eventClient.StartBatch()
 		}
-
-		eventBatchChannel.Close()
-		orchestrator.eventClient.WaitForBatchDbInsertion()
-		lastProcessedEvent = lastExtrinsicBlockHeight
-		eventBatchChannel = orchestrator.eventClient.StartBatch()
-		fmt.Println("Finished events up to block ", lastProcessedEvent) //dbg
 	}
 }
 

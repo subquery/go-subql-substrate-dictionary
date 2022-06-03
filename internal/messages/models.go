@@ -79,6 +79,7 @@ var (
 	EVENT_FIELD_FAILED                     = "Failed to get event field %s for an event at block height %d"
 	EVENT_UNKNOWN_EXTRINSIC_SUCCESS_STATUS = "%s is not a valid extrinsic success status"
 	EVENT_FAILED_TO_RETRIEVE_LAST_BLOCK    = "Failed to retrieve last event block from previous indexing"
+	EVENT_NO_PREVIOUS_WORK                 = "No previous event indexing was made"
 
 	// orchestrator
 	ORCHESTRATOR_START                  = "Starting client orchestrator"
