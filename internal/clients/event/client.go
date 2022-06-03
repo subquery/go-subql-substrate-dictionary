@@ -211,7 +211,10 @@ func (client *EventClient) startWorker() {
 
 // readRawEvent reads a raw event from rocksdb and returns it
 func (client *EventClient) readRawEvent(rootStateKey string) []byte {
-	stateKey, err := hex.DecodeString(rootStateKey)
+	var err error
+	stateKey := make([]byte, 64)
+
+	stateKey, err = hex.DecodeString(rootStateKey)
 	if err != nil {
 		panic(err)
 	}
@@ -240,8 +243,7 @@ func (client *EventClient) readRawEvent(rootStateKey string) []byte {
 					return decodedBranch.Value
 				}
 
-				childNibble := eventTriePathHexNibbles[nibbleCount]
-				childHash := decodedBranch.Children[childNibble].GetHash()
+				childHash := decodedBranch.Children[eventTriePathHexNibbles[nibbleCount]].GetHash()
 				nibbleCount++
 
 				stateKey = append([]byte{}, eventTriePathBytes[:nibbleCount/2]...)
