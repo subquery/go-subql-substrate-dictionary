@@ -9,7 +9,6 @@ import (
 	"go-dictionary/internal/db/postgres"
 	"go-dictionary/internal/db/rocksdb"
 	"go-dictionary/internal/messages"
-	"strconv"
 	"strings"
 
 	trieNode "go-dictionary/internal/trie/node"
@@ -217,13 +216,8 @@ func (client *EventClient) readRawEvent(rootStateKey string) []byte {
 		panic(err)
 	}
 
-	//TODO: transform to nibble slice from start??
-	eventsPathKey := eventTriePathKey
-	//TODO: allocate prefix length from beginning
-	prefix := []byte{}
-	nibblePos := 0
-
-	for len(eventsPathKey) != 0 {
+	nibbleCount := 0
+	for nibbleCount != triePathNibbleCount {
 		node, msg := client.rocksdbClient.GetStateTrieNode(stateKey)
 		if msg != nil {
 			msg.ConsoleLog()
@@ -240,36 +234,21 @@ func (client *EventClient) readRawEvent(rootStateKey string) []byte {
 			{
 				decodedBranch := decodedNode.(*trieNode.Branch)
 
-				key := decodedBranch.Key
-				if len(key) != 0 {
-					keyNibblePos := 0
-					keyBytes := []byte{}
-					for _, keyNibble := range key {
-						prefix = insertNibble(prefix, nibblePos, keyNibble)
-						//TODO: key is equivalent to keyBytes??? :))
-						keyBytes = insertNibble(keyBytes, keyNibblePos, keyNibble)
-						nibblePos++
-						keyNibblePos++
-					}
-					eventsPathKey = strings.TrimPrefix(eventsPathKey, hex.EncodeToString(keyBytes))
-				}
-
-				if len(eventsPathKey) == 0 {
+				// jump over the partial key
+				nibbleCount += len(decodedBranch.Key)
+				if nibbleCount == triePathNibbleCount {
 					return decodedBranch.Value
 				}
 
-				childIndex := []byte{eventsPathKey[0]}
-				index, err := strconv.ParseInt(string(childIndex), 16, 64)
-				if err != nil {
-					panic(err)
+				childNibble := eventTriePathHexNibbles[nibbleCount]
+				childHash := decodedBranch.Children[childNibble].GetHash()
+				nibbleCount++
+
+				stateKey = append([]byte{}, eventTriePathBytes[:nibbleCount/2]...)
+				if nibbleCount%2 == 1 {
+					stateKey = append(stateKey, nibbleToZeroPaddedByte[eventTriePathHexNibbles[nibbleCount-1]])
 				}
-				prefix = insertNibble(prefix, nibblePos, hexNibbleToByte[rune(eventsPathKey[0])])
-				nibblePos++
-
-				childHash := decodedBranch.Children[index].GetHash()
-				stateKey = append(prefix, childHash...)
-
-				eventsPathKey = eventsPathKey[1:]
+				stateKey = append(stateKey, childHash...)
 			}
 		case trieNode.LeafType:
 			{
