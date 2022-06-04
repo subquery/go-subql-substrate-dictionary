@@ -60,14 +60,13 @@ func NewOrchestrator(
 		dictionaryMessage.ConsoleLog()
 		panic(nil)
 	}
-
 	// SPEC VERSION -- spec version and ranges for each spec
 	specVersionClient := specversion.NewSpecVersionClient(
-		config.SpecVersionConfig.FirstSpecVersion,
+		config.ChainConfig.FirstSpecVersion,
 		lastBlock,
 		rdbClient,
 		pgClient,
-		config.ConnectionConfig.HttpRpcEndpoint,
+		config.ChainConfig.HttpRpcEndpoint,
 	)
 
 	specVersionsRange, dictionaryMessage := specVersionClient.Run()
@@ -79,7 +78,7 @@ func NewOrchestrator(
 	// METADATA -- meta for spec version
 	metadataClient := metadata.NewMetadataClient(
 		rdbClient,
-		config.ConnectionConfig.HttpRpcEndpoint,
+		config.ChainConfig.HttpRpcEndpoint,
 	)
 
 	specVersionMetadataMap, dictionaryMessage := metadataClient.GetMetadata(specVersionsRange)
@@ -101,7 +100,7 @@ func NewOrchestrator(
 	extrinsicClient := extrinsic.NewExtrinsicClient(
 		pgClient,
 		rdbClient,
-		config.WorkersConfig.ExtrinsicWorkers,
+		config.ClientsConfig.Extrinsics.Workers,
 		specVersionsRange,
 		specVersionMetadataMap,
 	)
@@ -111,7 +110,7 @@ func NewOrchestrator(
 	eventClient := event.NewEventClient(
 		pgClient,
 		rdbClient,
-		config.WorkersConfig.EventsWorkers,
+		config.ClientsConfig.Events.Workers,
 		specVersionsRange,
 		specVersionMetadataMap,
 	)
@@ -150,20 +149,19 @@ func (orchestrator *Orchestrator) runExtrinsics() {
 	var extrinsicBatchChannel *extrinsic.ExtrinsicBatchChannel
 	extrinsicBatchChannel = orchestrator.extrinsicClient.StartBatch()
 	startingBlock := orchestrator.extrinsicClient.RecoverLastInsertedBlock()
-
 	messages.NewDictionaryMessage(
 		messages.LOG_LEVEL_INFO,
 		"",
 		nil,
 		messages.ORCHESTRATOR_START_EXTRINSIC_BATCH,
-		orchestrator.configuration.WorkersConfig.ExtrinsicBatchSize,
+		orchestrator.configuration.ClientsConfig.Extrinsics.BatchSize,
 		startingBlock,
 	).ConsoleLog()
 
 	atomic.StoreUint64(&orchestrator.extrinsicHeight, uint64(startingBlock))
 
 	for blockHeight := startingBlock + 1; blockHeight <= orchestrator.lastBlock; blockHeight++ {
-		if blockHeight%orchestrator.configuration.WorkersConfig.ExtrinsicBatchSize == 0 {
+		if blockHeight%orchestrator.configuration.ClientsConfig.Extrinsics.BatchSize == 0 {
 			extrinsicBatchChannel.Close()
 			orchestrator.extrinsicClient.WaitForBatchDbInsertion()
 			atomic.StoreUint64(&orchestrator.extrinsicHeight, uint64(blockHeight-1))
@@ -182,7 +180,7 @@ func (orchestrator *Orchestrator) runExtrinsics() {
 				"",
 				nil,
 				messages.ORCHESTRATOR_START_EXTRINSIC_BATCH,
-				orchestrator.configuration.WorkersConfig.ExtrinsicBatchSize,
+				orchestrator.configuration.ClientsConfig.Extrinsics.BatchSize,
 				blockHeight,
 			).ConsoleLog()
 		}
@@ -212,7 +210,7 @@ func (orchestrator *Orchestrator) runEvents() {
 		if lastProcessedEvent < lastExtrinsicBlockHeight {
 			for blockHeight := lastProcessedEvent + 1; blockHeight <= lastExtrinsicBlockHeight; blockHeight++ {
 				//TODO: use event batch size
-				if blockHeight%orchestrator.configuration.WorkersConfig.ExtrinsicBatchSize == 0 {
+				if blockHeight%orchestrator.configuration.ClientsConfig.Events.BatchSize == 0 {
 					eventBatchChannel.Close()
 					orchestrator.eventClient.WaitForBatchDbInsertion()
 					lastProcessedEvent = blockHeight - 1

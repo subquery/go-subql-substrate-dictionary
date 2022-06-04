@@ -6,7 +6,7 @@ replace github.com/itering/scale.go => /tmp/scale.go
 
 require (
 	github.com/ChainSafe/gossamer v0.6.0
-	github.com/itering/scale.go v1.1.49
+	github.com/itering/scale.go v1.2.1
 	github.com/itering/substrate-api-rpc v0.4.11
 	github.com/jackc/pgx/v4 v4.15.0
 	github.com/linxGnu/grocksdb v1.6.48
