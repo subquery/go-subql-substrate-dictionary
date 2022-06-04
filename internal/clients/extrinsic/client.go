@@ -118,10 +118,10 @@ func (client *ExtrinsicClient) RecoverLastInsertedBlock() int {
 			nil,
 			messages.EXTRINSICS_NO_PREVIOUS_WORK,
 		).ConsoleLog()
-		return 1 //TODO: use first block from config file
+		return 1
 	}
 
-	return lastBlock + 1
+	return lastBlock
 }
 
 func (extrinsicBatchChan *ExtrinsicBatchChannel) Close() {
