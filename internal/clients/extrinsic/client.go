@@ -143,13 +143,7 @@ func (client *ExtrinsicClient) startWorker() {
 
 	for jobChan := range client.batchChan {
 		for job := range jobChan {
-
-			rawBodyData, msg := client.rocksdbClient.GetBodyForBlockLookupKey(job.BlockLookupKey)
-			if msg != nil {
-				msg.ConsoleLog()
-				panic(nil)
-			}
-
+			rawBodyData := client.rocksdbClient.GetBodyForBlockLookupKey(job.BlockLookupKey)
 			bodyDecoder.Init(types.ScaleBytes{Data: rawBodyData}, nil)
 			decodedBody := bodyDecoder.ProcessAndUpdateData(bodyTypeString)
 
@@ -161,7 +155,6 @@ func (client *ExtrinsicClient) startWorker() {
 					nil,
 					messages.FAILED_TYPE_ASSERTION,
 				).ConsoleLog()
-				panic(nil)
 			}
 
 			specVersion := client.specVersions.GetSpecVersionForBlock(job.BlockHeight)
@@ -181,7 +174,6 @@ func (client *ExtrinsicClient) startWorker() {
 						nil,
 						messages.FAILED_TYPE_ASSERTION,
 					).ConsoleLog()
-					panic(nil)
 				}
 
 				//TODO: "init" with options only if the spec version is new
@@ -194,7 +186,7 @@ func (client *ExtrinsicClient) startWorker() {
 					Module:      getCallModule(job.BlockHeight, decodedExtrinsic),
 					Call:        getCallFunction(job.BlockHeight, decodedExtrinsic),
 					BlockHeight: job.BlockHeight,
-					Success:     true, //TODO: replace with success state from events
+					Success:     true, //the real value is get from events
 					TxHash:      getHash(job.BlockHeight, decodedExtrinsic),
 					IsSigned:    isSigned(decodedExtrinsic),
 				}
@@ -217,7 +209,6 @@ func getCallModule(blockHeight int, decodedExtrinsic map[string]interface{}) str
 			extrinsicCallModuleField,
 			blockHeight,
 		).ConsoleLog()
-		panic(nil)
 	}
 
 	return strings.ToLower(callModule)
@@ -234,7 +225,6 @@ func getCallFunction(blockHeight int, decodedExtrinsic map[string]interface{}) s
 			extrinsicFunctionField,
 			blockHeight,
 		).ConsoleLog()
-		panic(nil)
 	}
 	return callFunction
 }
@@ -242,16 +232,8 @@ func getCallFunction(blockHeight int, decodedExtrinsic map[string]interface{}) s
 func getHash(blockHeight int, decodedExtrinsic map[string]interface{}) string {
 	txHash, ok := decodedExtrinsic[extrinsicHashField].(string)
 	if !ok {
+		//TODO: calculate "hash" if not found
 		return ""
-		// messages.NewDictionaryMessage(
-		// 	messages.LOG_LEVEL_ERROR,
-		// 	messages.GetComponent(getHash),
-		// 	nil,
-		// 	messages.EXTRINSIC_FIELD_FAILED,
-		// 	extrinsicHashField,
-		// 	blockHeight,
-		// ).ConsoleLog()
-		// panic(nil)
 	}
 	return txHash
 }

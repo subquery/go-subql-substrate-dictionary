@@ -39,27 +39,12 @@ func NewOrchestrator(
 	config config.Config,
 ) *Orchestrator {
 	// Postgres connect
-	pgClient, dictionaryMessage := postgres.Connect(config.PostgresConfig)
-	if dictionaryMessage != nil {
-		dictionaryMessage.ConsoleLog()
-		panic(nil)
-	}
+	pgClient := postgres.Connect(config.PostgresConfig)
 
 	// Rocksdb connect
-	rdbClient, dictionaryMessage := rocksdb.OpenRocksdb(
-		config.RocksdbConfig.RocksdbPath,
-		config.RocksdbConfig.RocksdbSecondaryPath,
-	)
-	if dictionaryMessage != nil {
-		dictionaryMessage.ConsoleLog()
-		panic(nil)
-	}
+	rdbClient := rocksdb.OpenRocksdb(config.RocksdbConfig)
+	lastBlock := rdbClient.GetLastBlockSynced()
 
-	lastBlock, dictionaryMessage := rdbClient.GetLastBlockSynced()
-	if dictionaryMessage != nil {
-		dictionaryMessage.ConsoleLog()
-		panic(nil)
-	}
 	// SPEC VERSION -- spec version and ranges for each spec
 	specVersionClient := specversion.NewSpecVersionClient(
 		config.ChainConfig.FirstSpecVersion,
@@ -69,11 +54,7 @@ func NewOrchestrator(
 		config.ChainConfig.HttpRpcEndpoint,
 	)
 
-	specVersionsRange, dictionaryMessage := specVersionClient.Run()
-	if dictionaryMessage != nil {
-		dictionaryMessage.ConsoleLog()
-		panic(nil)
-	}
+	specVersionsRange := specVersionClient.Run()
 
 	// METADATA -- meta for spec version
 	metadataClient := metadata.NewMetadataClient(
@@ -84,7 +65,6 @@ func NewOrchestrator(
 	specVersionMetadataMap, dictionaryMessage := metadataClient.GetMetadata(specVersionsRange)
 	if dictionaryMessage != nil {
 		dictionaryMessage.ConsoleLog()
-		panic(nil)
 	}
 
 	// Register custom types
@@ -185,11 +165,7 @@ func (orchestrator *Orchestrator) runExtrinsics() {
 			).ConsoleLog()
 		}
 
-		lookupKey, msg := orchestrator.rdbClient.GetLookupKeyForBlockHeight(blockHeight)
-		if msg != nil {
-			msg.ConsoleLog()
-			panic(nil)
-		}
+		lookupKey := orchestrator.rdbClient.GetLookupKeyForBlockHeight(blockHeight)
 
 		extrinsicBatchChannel.SendWork(blockHeight, lookupKey)
 	}
@@ -209,21 +185,17 @@ func (orchestrator *Orchestrator) runEvents() {
 
 		if lastProcessedEvent < lastExtrinsicBlockHeight {
 			for blockHeight := lastProcessedEvent + 1; blockHeight <= lastExtrinsicBlockHeight; blockHeight++ {
-				//TODO: use event batch size
 				if blockHeight%orchestrator.configuration.ClientsConfig.Events.BatchSize == 0 {
 					eventBatchChannel.Close()
 					orchestrator.eventClient.WaitForBatchDbInsertion()
 					lastProcessedEvent = blockHeight - 1
 					eventBatchChannel = orchestrator.eventClient.StartBatch()
 					fmt.Println("Finished events up to block ", lastProcessedEvent) //dbg
+					//TODO: continue will jump over a block
 					continue
 				}
 
-				lookupKey, msg := orchestrator.rdbClient.GetLookupKeyForBlockHeight(blockHeight)
-				if msg != nil {
-					msg.ConsoleLog()
-					panic(nil)
-				}
+				lookupKey := orchestrator.rdbClient.GetLookupKeyForBlockHeight(blockHeight)
 
 				eventBatchChannel.SendWork(blockHeight, lookupKey)
 			}

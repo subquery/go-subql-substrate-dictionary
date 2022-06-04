@@ -15,7 +15,7 @@ const (
 )
 
 // getLastSolvedBlockAndSpecVersion gets from the db the last block for which we managed to get it's spec version
-func (client *specvRepoClient) getLastSolvedBlockAndSpecVersion() (*SpecVersionRange, *messages.DictionaryMessage) {
+func (client *specvRepoClient) getLastSolvedBlockAndSpecVersion() *SpecVersionRange {
 	var (
 		err   error
 		specV SpecVersionRange
@@ -35,26 +35,30 @@ func (client *specvRepoClient) getLastSolvedBlockAndSpecVersion() (*SpecVersionR
 		)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return nil, messages.NewDictionaryMessage(
+			messages.NewDictionaryMessage(
 				messages.LOG_LEVEL_INFO,
 				"",
 				nil,
 				messages.SPEC_VERSION_NO_PREVIOUS_WORK,
-			)
+			).ConsoleLog()
+			return &SpecVersionRange{
+				SpecVersion: "-1",
+				First:       -1,
+			}
 		}
 
-		return nil, messages.NewDictionaryMessage(
+		messages.NewDictionaryMessage(
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(client.getLastSolvedBlockAndSpecVersion),
 			err,
 			messages.SPEC_VERSION_FAILED_DB_LAST_BLOCK,
-		)
+		).ConsoleLog()
 	}
-	return &specV, nil
+	return &specV
 }
 
 // getAllSpecVersionData retrieves all the spec versions info from db
-func (client *specvRepoClient) getAllSpecVersionData() (SpecVersionRangeList, *messages.DictionaryMessage) {
+func (client *specvRepoClient) getAllSpecVersionData() SpecVersionRangeList {
 	var (
 		err         error
 		specVData   []SpecVersionRange
@@ -71,21 +75,22 @@ func (client *specvRepoClient) getAllSpecVersionData() (SpecVersionRangeList, *m
 
 	rows, err = client.Pool.Query(context.Background(), query)
 	if err != nil {
+		// we already checked before calling this that there is data in db
 		if err == pgx.ErrNoRows {
-			return nil, messages.NewDictionaryMessage(
-				messages.LOG_LEVEL_INFO,
-				"",
-				nil,
+			messages.NewDictionaryMessage(
+				messages.LOG_LEVEL_ERROR,
+				messages.GetComponent(client.getLastSolvedBlockAndSpecVersion),
+				err,
 				messages.SPEC_VERSION_NO_PREVIOUS_WORK,
-			)
+			).ConsoleLog()
 		}
 
-		return nil, messages.NewDictionaryMessage(
+		messages.NewDictionaryMessage(
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(client.getLastSolvedBlockAndSpecVersion),
 			err,
 			messages.SPEC_VERSION_FAILED_DB,
-		)
+		).ConsoleLog()
 	}
 
 	// no defer rows.Close() as Next() automatically closes them
@@ -97,7 +102,7 @@ func (client *specvRepoClient) getAllSpecVersionData() (SpecVersionRangeList, *m
 		specVData = append(specVData, SpecVersionRange{SpecVersion: id, First: blockHeight})
 	}
 
-	return specVData, nil
+	return specVData
 }
 
 // insertSpecVersionsList inserts in a transaction the spec version list received as a parameter;
@@ -106,7 +111,7 @@ func (client *specvRepoClient) getAllSpecVersionData() (SpecVersionRangeList, *m
 // be sent
 func (client *specvRepoClient) insertSpecVersionsList(
 	newSpecVersions SpecVersionRangeList,
-) *messages.DictionaryMessage {
+) {
 	messages.NewDictionaryMessage(
 		messages.LOG_LEVEL_INFO,
 		"",
@@ -117,12 +122,12 @@ func (client *specvRepoClient) insertSpecVersionsList(
 
 	tx, err := client.Pool.BeginTx(context.Background(), pgx.TxOptions{})
 	if err != nil {
-		return messages.NewDictionaryMessage(
+		messages.NewDictionaryMessage(
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(client.insertSpecVersionsList),
 			err,
 			messages.POSTGRES_FAILED_TO_START_TRANSACTION,
-		)
+		).ConsoleLog()
 	}
 	defer tx.Rollback(context.Background())
 
@@ -141,30 +146,30 @@ func (client *specvRepoClient) insertSpecVersionsList(
 		pgx.CopyFromRows(insertRows),
 	)
 	if err != nil {
-		return messages.NewDictionaryMessage(
+		messages.NewDictionaryMessage(
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(client.insertSpecVersionsList),
 			err,
 			messages.POSTGRES_FAILED_TO_COPY_FROM,
-		)
+		).ConsoleLog()
 	}
 	if copyLen != int64(len(insertRows)) {
-		return messages.NewDictionaryMessage(
+		messages.NewDictionaryMessage(
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(client.insertSpecVersionsList),
 			fmt.Errorf(messages.POSTGRES_WRONG_NUMBER_OF_COPIED_ROWS, copyLen, len(insertRows)),
 			"",
-		)
+		).ConsoleLog()
 	}
 
 	err = tx.Commit(context.Background())
 	if err != nil {
-		return messages.NewDictionaryMessage(
+		messages.NewDictionaryMessage(
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(client.insertSpecVersionsList),
 			err,
 			messages.POSTGRES_FAILED_TO_COMMIT_TX,
-		)
+		).ConsoleLog()
 	}
 
 	messages.NewDictionaryMessage(
@@ -173,6 +178,4 @@ func (client *specvRepoClient) insertSpecVersionsList(
 		nil,
 		messages.SPEC_VERSION_DB_SUCCESS,
 	).ConsoleLog()
-
-	return nil
 }

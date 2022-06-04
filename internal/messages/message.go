@@ -13,17 +13,15 @@ func NewDictionaryMessage(level DictionaryLogLevel, component string, err error,
 }
 
 func (dictMsg *DictionaryMessage) ConsoleLog() {
-	var msg string
 	switch dictMsg.LogLevel {
 	case LOG_LEVEL_INFO, LOG_LEVEL_SUCCESS, LOG_LEVEL_WARNING:
-		msg = dictMsg.formatMessage()
+		dictMsg.formatMessage()
 	case LOG_LEVEL_ERROR:
-		msg = dictMsg.formatError()
+		dictMsg.formatError()
 	}
-	fmt.Println(msg)
 }
 
-func (dictMsg *DictionaryMessage) formatMessage() string {
+func (dictMsg *DictionaryMessage) formatMessage() {
 	// [LOG_LEVEL] custom_message
 	fmtString := "[%s] " + dictMsg.FormatString
 	additionalArgs := append([]interface{}{dictMsg.LogLevel}, dictMsg.AdditionalInfo...)
@@ -38,10 +36,10 @@ func (dictMsg *DictionaryMessage) formatMessage() string {
 	default:
 		msg = white + msg + reset
 	}
-	return msg
+	fmt.Println(msg)
 }
 
-func (dictMsg *DictionaryMessage) formatError() string {
+func (dictMsg *DictionaryMessage) formatError() {
 	// [LOG_LEVEL][COMPONENT] custom_message: error_message
 	fmtString := "[%s][%s] " + dictMsg.FormatString + ": [%v]"
 	var additionalArgs []interface{}
@@ -50,5 +48,6 @@ func (dictMsg *DictionaryMessage) formatError() string {
 	additionalArgs = append(additionalArgs, dictMsg.Error)
 	msg := fmt.Sprintf(fmtString, additionalArgs...)
 	msg = red + msg + reset
-	return msg
+	fmt.Println(msg)
+	panic(nil)
 }

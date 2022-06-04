@@ -63,10 +63,7 @@ func (metaClient *MetadataClient) GetMetadata(specvRangeList specversion.SpecVer
 
 // getMetadata retrieves the metadata instant for a block height
 func (metaClient *MetadataClient) getMetadata(blockHeight, specVersion int) (*DictionaryMetadata, *messages.DictionaryMessage) {
-	hash, msg := metaClient.rocksdbClient.GetBlockHash(blockHeight)
-	if msg != nil {
-		return nil, msg
-	}
+	hash := metaClient.rocksdbClient.GetBlockHash(blockHeight)
 
 	reqBody := bytes.NewBuffer([]byte(rpc.StateGetMetadata(1, hash)))
 	resp, err := http.Post(metaClient.httpEndpoint, "application/json", reqBody)

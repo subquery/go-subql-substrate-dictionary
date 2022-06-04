@@ -1,12 +1,17 @@
 package specversion
 
-import "strconv"
+import (
+	"strconv"
+
+	"github.com/itering/scale.go/types"
+)
 
 type (
 	SpecVersionRange struct {
 		SpecVersion string `json:"spec_version"`
 		First       int    `json:"first"` //first block for a spec version
 		Last        int    `json:"last"`  //last block for a spec version
+		Meta        *types.MetadataStruct
 	}
 
 	SpecVersionRangeList []SpecVersionRange

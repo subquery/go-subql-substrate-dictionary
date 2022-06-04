@@ -23,6 +23,8 @@ var (
 	CONFIG_NO_CUSTOM_PATH_SPECIFIED = "No config file path specified with --c, --configfile. Using default path."
 	CONFIG_STARTED_LOADING          = "The dictionary configuration is loaded from %s"
 	CONFIG_FINISHED_LOADING         = "The dictionary configuration successfully loaded"
+	CONFIG_FAILED_TO_OPEN_FILE      = "Failed to open configuration file %s"
+	CONFIG_WRONG_FILE_FORMAT        = "The configuration files isn't in the right format"
 
 	// rocksdb messages
 	ROCKSDB_CONNECTING                      = "Connecting to rocksdb instance at %s"

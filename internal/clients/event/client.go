@@ -40,27 +40,6 @@ type (
 	}
 )
 
-var (
-	hexNibbleToByte map[rune]byte = map[rune]byte{
-		'0': 0,
-		'1': 1,
-		'2': 2,
-		'3': 3,
-		'4': 4,
-		'5': 5,
-		'6': 6,
-		'7': 7,
-		'8': 8,
-		'9': 9,
-		'a': 0xa,
-		'b': 0xb,
-		'c': 0xc,
-		'd': 0xd,
-		'e': 0xe,
-		'f': 0xf,
-	}
-)
-
 func NewEventClient(
 	pgClient *postgres.PostgresClient,
 	rocksdbClient *rocksdb.RockClient,
@@ -154,13 +133,7 @@ func (client *EventClient) startWorker() {
 
 	for jobChan := range client.batchChan {
 		for job := range jobChan {
-
-			rawHeaderData, msg := client.rocksdbClient.GetHeaderForBlockLookupKey(job.BlockLookupKey)
-			if msg != nil {
-				msg.ConsoleLog()
-				panic(nil)
-			}
-
+			rawHeaderData := client.rocksdbClient.GetHeaderForBlockLookupKey(job.BlockLookupKey)
 			headerDecoder.Init(types.ScaleBytes{Data: rawHeaderData}, nil)
 			decodedHeader := headerDecoder.ProcessAndUpdateData(headerTypeString)
 			stateRootKey := getStateRootFromRawHeader(decodedHeader)
@@ -221,12 +194,7 @@ func (client *EventClient) readRawEvent(rootStateKey string) []byte {
 
 	nibbleCount := 0
 	for nibbleCount != triePathNibbleCount {
-		node, msg := client.rocksdbClient.GetStateTrieNode(stateKey)
-		if msg != nil {
-			msg.ConsoleLog()
-			panic(nil)
-		}
-
+		node := client.rocksdbClient.GetStateTrieNode(stateKey)
 		decodedNode, err := trieNode.Decode(bytes.NewReader(node))
 		if err != nil {
 			panic(err)
@@ -262,15 +230,6 @@ func (client *EventClient) readRawEvent(rootStateKey string) []byte {
 	return nil
 }
 
-func insertNibble(dest []byte, nibblePos int, nibble byte) []byte {
-	if nibblePos%2 == 0 {
-		dest = append(dest, nibble<<4&0xf0)
-		return dest
-	}
-	dest[len(dest)-1] = dest[len(dest)-1] | nibble&0xf
-	return dest
-}
-
 // getStateRootFromRawHeader gets the state root from a decoded block header
 func getStateRootFromRawHeader(rawHeader interface{}) string {
 	stateRoot, ok := rawHeader.(map[string]interface{})["state_root"].(string)
@@ -281,7 +240,6 @@ func getStateRootFromRawHeader(rawHeader interface{}) string {
 			nil,
 			messages.EVENT_STATE_ROOT_NOT_FOUND,
 		).ConsoleLog()
-		panic(nil)
 	}
 
 	return strings.TrimPrefix(stateRoot, "0x")
@@ -298,7 +256,6 @@ func getEventId(blockHeight int, decodedEvent map[string]interface{}) string {
 			eventIdField,
 			blockHeight,
 		).ConsoleLog()
-		panic(nil)
 	}
 
 	return fmt.Sprintf("%d-%d", blockHeight, eventId)
@@ -315,7 +272,6 @@ func getEventModule(blockHeight int, decodedEvent map[string]interface{}) string
 			eventModuleField,
 			blockHeight,
 		).ConsoleLog()
-		panic(nil)
 	}
 	return strings.ToLower(module)
 }
@@ -331,7 +287,6 @@ func getEventCall(blockHeight int, decodedEvent map[string]interface{}) string {
 			eventEventField,
 			blockHeight,
 		).ConsoleLog()
-		panic(nil)
 	}
 	return event
 }
