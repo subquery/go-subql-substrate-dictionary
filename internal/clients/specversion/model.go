@@ -1,7 +1,7 @@
 package specversion
 
 import (
-	"strconv"
+	"go-dictionary/internal/messages"
 
 	"github.com/itering/scale.go/types"
 )
@@ -27,12 +27,18 @@ func (specVersionRangeList SpecVersionRangeList) FillLast(lastIndexedBlock int) 
 }
 
 // GetSpecVersionForBlock receives a block height and returns it's spec version
-func (specVersionRangeList SpecVersionRangeList) GetSpecVersionForBlock(blockHeight int) int {
+func (specVersionRangeList SpecVersionRangeList) GetSpecVersionForBlock(blockHeight int) *SpecVersionRange {
 	for idx, spec := range specVersionRangeList {
 		if blockHeight >= spec.First && blockHeight <= spec.Last {
-			specVNumber, _ := strconv.Atoi(specVersionRangeList[idx].SpecVersion)
-			return specVNumber
+			return &specVersionRangeList[idx]
 		}
 	}
-	return -1
+	messages.NewDictionaryMessage(
+		messages.LOG_LEVEL_ERROR,
+		messages.GetComponent(specVersionRangeList.GetSpecVersionForBlock),
+		nil,
+		messages.SPEC_VERSION_WRONG_BLOCK,
+		blockHeight,
+	).ConsoleLog()
+	return nil
 }

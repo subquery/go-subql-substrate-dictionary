@@ -7,6 +7,7 @@ import (
 	"go-dictionary/internal/messages"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"go-dictionary/internal/db/postgres"
 	"go-dictionary/internal/db/rocksdb"
@@ -64,6 +65,7 @@ func (specVClient *SpecVersionClient) Run() SpecVersionRangeList {
 		lastSavedDbBlockInfo     *SpecVersionRange
 		err                      error
 		isDataInDb               bool
+		wg                       sync.WaitGroup
 	)
 	specList := SpecVersionRangeList{}
 	insertPosition := 0
@@ -82,6 +84,15 @@ func (specVClient *SpecVersionClient) Run() SpecVersionRangeList {
 		specList = specVClient.pgClient.getAllSpecVersionData()
 		specList.FillLast(specVClient.lastBlock)
 		insertPosition = len(specList)
+
+		wg.Add(len(specList))
+		for i := 0; i < len(specList); i++ {
+			go func(idx int) {
+				defer wg.Done()
+				specList[idx].Meta = specVClient.getMetadata(specList[idx].First)
+			}(i)
+		}
+		wg.Wait()
 	}
 
 	// if last block in db is equal to last block indexed by node, simply return the info about the blocks in db
@@ -126,6 +137,7 @@ func (specVClient *SpecVersionClient) Run() SpecVersionRangeList {
 				Last:        actualLastBlock,
 				First:       first,
 				SpecVersion: currentSpecVersionString,
+				Meta:        specVClient.getMetadata(first),
 			})
 			shouldInsert = true
 		} else {
@@ -157,10 +169,8 @@ func (specVClient *SpecVersionClient) Run() SpecVersionRangeList {
 // GetSpecVersion downloads the spec version for a block using the HTTP RPC endpoint
 func (specVClient *SpecVersionClient) getSpecVersion(height int) int {
 	hash := specVClient.rocksdbClient.GetBlockHash(height)
-
 	msg := fmt.Sprintf(SPEC_VERSION_MESSAGE, hash)
 	reqBody := bytes.NewBuffer([]byte(msg))
-
 	resp, postErr := http.Post(specVClient.httpEndpoint, "application/json", reqBody)
 	if postErr != nil {
 		messages.NewDictionaryMessage(
@@ -257,19 +267,18 @@ func (specVClient *SpecVersionClient) getAllDbSpecVersions() SpecVersionRangeLis
 }
 
 // getMetadata retrieves the metadata instant for a block height
-func (metaClient *SpecVersionClient) getMetadata(blockHeight, specVersion int) (*types.MetadataStruct, *messages.DictionaryMessage) {
-	hash := metaClient.rocksdbClient.GetBlockHash(blockHeight)
-
+func (specVClient *SpecVersionClient) getMetadata(blockHeight int) *types.MetadataStruct {
+	hash := specVClient.rocksdbClient.GetBlockHash(blockHeight)
 	reqBody := bytes.NewBuffer([]byte(rpc.StateGetMetadata(1, hash)))
-	resp, err := http.Post(metaClient.httpEndpoint, "application/json", reqBody)
+	resp, err := http.Post(specVClient.httpEndpoint, "application/json", reqBody)
 	if err != nil {
-		return nil, messages.NewDictionaryMessage(
+		messages.NewDictionaryMessage(
 			messages.LOG_LEVEL_ERROR,
-			messages.GetComponent(metaClient.getMetadata),
+			messages.GetComponent(specVClient.getMetadata),
 			err,
 			messages.META_FAILED_POST_MESSAGE,
 			blockHeight,
-		)
+		).ConsoleLog()
 	}
 	defer resp.Body.Close()
 
@@ -277,28 +286,27 @@ func (metaClient *SpecVersionClient) getMetadata(blockHeight, specVersion int) (
 	json.NewDecoder(resp.Body).Decode(metaRawBody)
 	metaBodyString, err := metaRawBody.ToString()
 	if err != nil {
-		return nil, messages.NewDictionaryMessage(
+		messages.NewDictionaryMessage(
 			messages.LOG_LEVEL_ERROR,
-			messages.GetComponent(metaClient.getMetadata),
+			messages.GetComponent(specVClient.getMetadata),
 			err,
 			messages.META_FAILED_TO_DECODE_BODY,
 			blockHeight,
-		)
+		).ConsoleLog()
 	}
 
 	metaDecoder := scalecodec.MetadataDecoder{}
 	metaDecoder.Init(utiles.HexToBytes(metaBodyString))
 	err = metaDecoder.Process()
 	if err != nil {
-		return nil,
-			messages.NewDictionaryMessage(
-				messages.LOG_LEVEL_ERROR,
-				messages.GetComponent(metaClient.getMetadata),
-				err,
-				messages.META_FAILED_SCALE_DECODE,
-				blockHeight,
-			)
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(specVClient.getMetadata),
+			err,
+			messages.META_FAILED_SCALE_DECODE,
+			blockHeight,
+		).ConsoleLog()
 	}
 
-	return &metaDecoder.Metadata, nil
+	return &metaDecoder.Metadata
 }

@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"go-dictionary/internal/clients/metadata"
 	"go-dictionary/internal/clients/specversion"
 	"go-dictionary/internal/db/postgres"
 	"go-dictionary/internal/db/rocksdb"
 	"go-dictionary/internal/messages"
+	"strconv"
 	"strings"
 
 	trieNode "go-dictionary/internal/trie/node"
@@ -20,12 +20,11 @@ import (
 
 type (
 	EventClient struct {
-		pgClient               eventRepoClient
-		rocksdbClient          *rocksdb.RockClient
-		workersCount           int
-		batchChan              chan chan *eventJob
-		specVersions           specversion.SpecVersionRangeList
-		specVersionMetadataMap map[string]*metadata.DictionaryMetadata
+		pgClient      eventRepoClient
+		rocksdbClient *rocksdb.RockClient
+		workersCount  int
+		batchChan     chan chan *eventJob
+		specVersions  specversion.SpecVersionRangeList
 	}
 
 	eventRepoClient struct {
@@ -45,7 +44,6 @@ func NewEventClient(
 	rocksdbClient *rocksdb.RockClient,
 	workersCount int,
 	specVersions specversion.SpecVersionRangeList,
-	specVersionMetadataMap map[string]*metadata.DictionaryMetadata,
 ) *EventClient {
 	batchChan := make(chan chan *eventJob, workersCount)
 	dbChan := make(chan *Event, workersCount)
@@ -58,11 +56,10 @@ func NewEventClient(
 			workersCount,
 			batchFinishedChan,
 		},
-		rocksdbClient:          rocksdbClient,
-		workersCount:           workersCount,
-		batchChan:              batchChan,
-		specVersions:           specVersions,
-		specVersionMetadataMap: specVersionMetadataMap,
+		rocksdbClient: rocksdbClient,
+		workersCount:  workersCount,
+		batchChan:     batchChan,
+		specVersions:  specVersions,
 	}
 }
 
@@ -109,7 +106,7 @@ func (client *EventClient) RecoverLastInsertedBlock() int {
 			nil,
 			messages.EVENT_NO_PREVIOUS_WORK,
 		).ConsoleLog()
-		return 1
+		return 1 //return first chain block
 	}
 	return lastBlock
 }
@@ -139,11 +136,10 @@ func (client *EventClient) startWorker() {
 			stateRootKey := getStateRootFromRawHeader(decodedHeader)
 			rawEvents := client.readRawEvent(stateRootKey)
 
-			specVersion := client.specVersions.GetSpecVersionForBlock(job.BlockHeight)
-			metadata := client.specVersionMetadataMap[fmt.Sprintf("%d", specVersion)].Meta
-
+			specVersionMeta := client.specVersions.GetSpecVersionForBlock(job.BlockHeight)
+			specVersion, _ := strconv.Atoi(specVersionMeta.SpecVersion)
 			if eventDecoderOption.Spec == -1 || eventDecoderOption.Spec != specVersion {
-				eventDecoderOption.Metadata = metadata
+				eventDecoderOption.Metadata = specVersionMeta.Meta
 				eventDecoderOption.Spec = specVersion
 			}
 

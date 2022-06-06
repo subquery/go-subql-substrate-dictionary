@@ -2,11 +2,11 @@ package extrinsic
 
 import (
 	"fmt"
-	"go-dictionary/internal/clients/metadata"
 	"go-dictionary/internal/clients/specversion"
 	"go-dictionary/internal/db/postgres"
 	"go-dictionary/internal/db/rocksdb"
 	"go-dictionary/internal/messages"
+	"strconv"
 	"strings"
 
 	scale "github.com/itering/scale.go"
@@ -16,12 +16,11 @@ import (
 
 type (
 	ExtrinsicClient struct {
-		pgClient               extrinsicRepoClient
-		rocksdbClient          *rocksdb.RockClient
-		workersCount           int
-		batchChan              chan chan *ExtrinsicJob
-		specVersions           specversion.SpecVersionRangeList
-		specVersionMetadataMap map[string]*metadata.DictionaryMetadata
+		pgClient      extrinsicRepoClient
+		rocksdbClient *rocksdb.RockClient
+		workersCount  int
+		batchChan     chan chan *ExtrinsicJob
+		specVersions  specversion.SpecVersionRangeList
 	}
 
 	extrinsicRepoClient struct {
@@ -45,7 +44,6 @@ func NewExtrinsicClient(
 	rocksdbClient *rocksdb.RockClient,
 	workersCount int,
 	specVersions specversion.SpecVersionRangeList,
-	specVersionMetadataMap map[string]*metadata.DictionaryMetadata,
 ) *ExtrinsicClient {
 
 	batchChan := make(chan chan *ExtrinsicJob, workersCount)
@@ -59,11 +57,10 @@ func NewExtrinsicClient(
 			workersCount,
 			batchFinishedChan,
 		},
-		rocksdbClient:          rocksdbClient,
-		workersCount:           workersCount,
-		batchChan:              batchChan,
-		specVersions:           specVersions,
-		specVersionMetadataMap: specVersionMetadataMap,
+		rocksdbClient: rocksdbClient,
+		workersCount:  workersCount,
+		batchChan:     batchChan,
+		specVersions:  specVersions,
 	}
 }
 
@@ -157,11 +154,10 @@ func (client *ExtrinsicClient) startWorker() {
 				).ConsoleLog()
 			}
 
-			specVersion := client.specVersions.GetSpecVersionForBlock(job.BlockHeight)
-			metadata := client.specVersionMetadataMap[fmt.Sprintf("%d", specVersion)].Meta
-
+			specVersionMeta := client.specVersions.GetSpecVersionForBlock(job.BlockHeight)
+			specVersion, _ := strconv.Atoi(specVersionMeta.SpecVersion)
 			if extrinsicDecoderOption.Spec == -1 || extrinsicDecoderOption.Spec != specVersion {
-				extrinsicDecoderOption.Metadata = metadata
+				extrinsicDecoderOption.Metadata = specVersionMeta.Meta
 				extrinsicDecoderOption.Spec = specVersion
 			}
 

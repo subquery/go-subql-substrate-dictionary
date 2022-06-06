@@ -118,22 +118,37 @@ func (repoClient *eventRepoClient) insertBatch(
 		).ConsoleLog()
 	}
 
+	extrinsicUpdateBatch := &pgx.Batch{}
 	for _, extrinsicUpdate := range updateExtrinsics {
-		_, err := tx.Exec(
-			context.Background(),
+		extrinsicUpdateBatch.Queue(
 			updateExtrinsicQuery,
 			extrinsicUpdate.Success,
 			extrinsicUpdate.Id,
 		)
-		if err != nil {
-			messages.NewDictionaryMessage(
-				messages.LOG_LEVEL_ERROR,
-				messages.GetComponent(repoClient.insertBatch),
-				err,
-				messages.POSTGRES_FAILED_TO_EXECUTE_UPDATE,
-			).ConsoleLog()
-		}
+
 	}
+	batchResults := tx.SendBatch(context.Background(), extrinsicUpdateBatch)
+	defer batchResults.Close()
+	commandTag, err := batchResults.Exec()
+	if err != nil {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(repoClient.insertBatch),
+			err,
+			messages.POSTGRES_FAILED_TO_EXECUTE_UPDATE,
+		).ConsoleLog()
+	}
+	if commandTag.RowsAffected() != 1 {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(repoClient.insertBatch),
+			nil,
+			messages.EVENT_WRONG_UPDATE_NUMBER,
+			commandTag.RowsAffected(),
+			1,
+		).ConsoleLog()
+	}
+	batchResults.Close()
 
 	err = tx.Commit(context.Background())
 	if err != nil {
