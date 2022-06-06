@@ -21,11 +21,10 @@ import (
 
 type (
 	SpecVersionClient struct {
-		startingBlockSpecVersion int //spec version for the first block (block #0)
-		lastBlock                int //last indexed block by the node we interrogate
-		rocksdbClient            *rocksdb.RockClient
-		pgClient                 specvRepoClient
-		httpEndpoint             string
+		lastBlock     int //last indexed block by the node we interrogate
+		rocksdbClient *rocksdb.RockClient
+		pgClient      specvRepoClient
+		httpEndpoint  string
 	}
 
 	specvRepoClient struct {
@@ -42,17 +41,15 @@ var (
 )
 
 func NewSpecVersionClient(
-	startBlockSpecVersion int,
 	lastBlock int,
 	rocksdbClient *rocksdb.RockClient,
 	pgClient *postgres.PostgresClient,
 	httpRpcEndpoint string) *SpecVersionClient {
 	return &SpecVersionClient{
-		startingBlockSpecVersion: startBlockSpecVersion,
-		lastBlock:                lastBlock,
-		rocksdbClient:            rocksdbClient,
-		pgClient:                 specvRepoClient{pgClient},
-		httpEndpoint:             httpRpcEndpoint,
+		lastBlock:     lastBlock,
+		rocksdbClient: rocksdbClient,
+		pgClient:      specvRepoClient{pgClient},
+		httpEndpoint:  httpRpcEndpoint,
 	}
 }
 

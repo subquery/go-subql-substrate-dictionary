@@ -10,7 +10,6 @@ type PostgresConfig struct {
 }
 
 type ChainConfig struct {
-	FirstSpecVersion int    `json:"first_spec_version"`
 	HttpRpcEndpoint  string `json:"http_rpc_endpoint"`
 	DecoderTypesFile string `json:"decoder_types_file"`
 }

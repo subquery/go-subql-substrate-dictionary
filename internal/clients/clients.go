@@ -44,7 +44,6 @@ func NewOrchestrator(
 
 	// SPEC VERSION -- spec version and ranges for each spec
 	specVersionClient := specversion.NewSpecVersionClient(
-		config.ChainConfig.FirstSpecVersion,
 		lastBlock,
 		rdbClient,
 		pgClient,
