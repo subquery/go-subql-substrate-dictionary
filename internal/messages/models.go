@@ -23,6 +23,8 @@ var (
 	CONFIG_NO_CUSTOM_PATH_SPECIFIED = "No config file path specified with --c, --configfile. Using default path."
 	CONFIG_STARTED_LOADING          = "The dictionary configuration is loaded from %s"
 	CONFIG_FINISHED_LOADING         = "The dictionary configuration successfully loaded"
+	CONFIG_FAILED_TO_OPEN_FILE      = "Failed to open configuration file %s"
+	CONFIG_WRONG_FILE_FORMAT        = "The configuration files isn't in the right format"
 
 	// rocksdb messages
 	ROCKSDB_CONNECTING                      = "Connecting to rocksdb instance at %s"
@@ -57,6 +59,7 @@ var (
 	SPEC_VERSION_UP_TO_DATE           = "Spec versions saved in db are up to date"
 	SPEC_VERSION_NO_PREVIOUS_WORK     = "No spec version info was saved from previous executions"
 	SPEC_VERSION_RECOVERED            = "Spec version recovered from last run"
+	SPEC_VERSION_WRONG_BLOCK          = "Cannot get spec version for block %d"
 
 	// metadata
 	META_FAILED_POST_MESSAGE   = "Failed to get metadata from HTTP endpoint for block %d"
@@ -80,6 +83,7 @@ var (
 	EVENT_UNKNOWN_EXTRINSIC_SUCCESS_STATUS = "%s is not a valid extrinsic success status"
 	EVENT_FAILED_TO_RETRIEVE_LAST_BLOCK    = "Failed to retrieve last event block from previous indexing"
 	EVENT_NO_PREVIOUS_WORK                 = "No previous event indexing was made"
+	EVENT_WRONG_UPDATE_NUMBER              = "%d extrinsic updates were sent, but only %d took effect"
 
 	// orchestrator
 	ORCHESTRATOR_START                  = "Starting client orchestrator"

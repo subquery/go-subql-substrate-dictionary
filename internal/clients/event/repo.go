@@ -87,7 +87,6 @@ func (repoClient *eventRepoClient) insertBatch(
 			err,
 			messages.POSTGRES_FAILED_TO_START_TRANSACTION,
 		).ConsoleLog()
-		panic(nil)
 	}
 	defer tx.Rollback(context.Background())
 
@@ -109,7 +108,6 @@ func (repoClient *eventRepoClient) insertBatch(
 			err,
 			messages.POSTGRES_FAILED_TO_COPY_FROM,
 		).ConsoleLog()
-		panic(nil)
 	}
 	if copyLen != int64(len(batch)) {
 		messages.NewDictionaryMessage(
@@ -118,26 +116,39 @@ func (repoClient *eventRepoClient) insertBatch(
 			fmt.Errorf(messages.POSTGRES_WRONG_NUMBER_OF_COPIED_ROWS, copyLen, len(batch)),
 			"",
 		).ConsoleLog()
-		panic(nil)
 	}
 
+	extrinsicUpdateBatch := &pgx.Batch{}
 	for _, extrinsicUpdate := range updateExtrinsics {
-		_, err := tx.Exec(
-			context.Background(),
+		extrinsicUpdateBatch.Queue(
 			updateExtrinsicQuery,
 			extrinsicUpdate.Success,
 			extrinsicUpdate.Id,
 		)
-		if err != nil {
-			messages.NewDictionaryMessage(
-				messages.LOG_LEVEL_ERROR,
-				messages.GetComponent(repoClient.insertBatch),
-				err,
-				messages.POSTGRES_FAILED_TO_EXECUTE_UPDATE,
-			).ConsoleLog()
-			panic(nil)
-		}
+
 	}
+	batchResults := tx.SendBatch(context.Background(), extrinsicUpdateBatch)
+	defer batchResults.Close()
+	commandTag, err := batchResults.Exec()
+	if err != nil {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(repoClient.insertBatch),
+			err,
+			messages.POSTGRES_FAILED_TO_EXECUTE_UPDATE,
+		).ConsoleLog()
+	}
+	if commandTag.RowsAffected() != 1 {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(repoClient.insertBatch),
+			nil,
+			messages.EVENT_WRONG_UPDATE_NUMBER,
+			commandTag.RowsAffected(),
+			1,
+		).ConsoleLog()
+	}
+	batchResults.Close()
 
 	err = tx.Commit(context.Background())
 	if err != nil {
@@ -147,7 +158,6 @@ func (repoClient *eventRepoClient) insertBatch(
 			err,
 			messages.POSTGRES_FAILED_TO_COMMIT_TX,
 		).ConsoleLog()
-		panic(nil)
 	}
 }
 
@@ -176,7 +186,6 @@ func (repoClient *eventRepoClient) recoverLastBlock() int {
 			err,
 			messages.EVENT_FAILED_TO_RETRIEVE_LAST_BLOCK,
 		).ConsoleLog()
-		panic(nil)
 	}
 
 	return blockHeight
@@ -198,5 +207,5 @@ func getExtrinsicSuccess(eventCall string) bool {
 		messages.EVENT_UNKNOWN_EXTRINSIC_SUCCESS_STATUS,
 		eventCall,
 	).ConsoleLog()
-	panic(nil)
+	return false
 }

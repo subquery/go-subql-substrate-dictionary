@@ -15,7 +15,6 @@
         }
     },
     "chain_config": {
-        "first_spec_version": 900,
         "http_rpc_endpoint": "http://127.0.0.1:9933",
         "decoder_types_file": "./network/moonbeam.json"
     },

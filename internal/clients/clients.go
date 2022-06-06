@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"go-dictionary/internal/clients/event"
 	"go-dictionary/internal/clients/extrinsic"
-	"go-dictionary/internal/clients/metadata"
 	"go-dictionary/internal/clients/specversion"
 	"go-dictionary/internal/config"
 	"go-dictionary/internal/db/postgres"
@@ -20,17 +19,15 @@ import (
 
 type (
 	Orchestrator struct {
-		configuration      config.Config
-		pgClient           *postgres.PostgresClient
-		rdbClient          *rocksdb.RockClient
-		lastBlock          int
-		specversionClient  *specversion.SpecVersionClient
-		specVersionRange   specversion.SpecVersionRangeList
-		metadataClient     *metadata.MetadataClient
-		specVersionMetaMap map[string]*metadata.DictionaryMetadata
-		extrinsicClient    *extrinsic.ExtrinsicClient
-		eventClient        *event.EventClient
-		extrinsicHeight    uint64
+		configuration     config.Config
+		pgClient          *postgres.PostgresClient
+		rdbClient         *rocksdb.RockClient
+		lastBlock         int
+		specversionClient *specversion.SpecVersionClient
+		specVersionRange  specversion.SpecVersionRangeList
+		extrinsicClient   *extrinsic.ExtrinsicClient
+		eventClient       *event.EventClient
+		extrinsicHeight   uint64
 	}
 )
 
@@ -39,57 +36,24 @@ func NewOrchestrator(
 	config config.Config,
 ) *Orchestrator {
 	// Postgres connect
-	pgClient, dictionaryMessage := postgres.Connect(config.PostgresConfig)
-	if dictionaryMessage != nil {
-		dictionaryMessage.ConsoleLog()
-		panic(nil)
-	}
+	pgClient := postgres.Connect(config.PostgresConfig)
 
 	// Rocksdb connect
-	rdbClient, dictionaryMessage := rocksdb.OpenRocksdb(
-		config.RocksdbConfig.RocksdbPath,
-		config.RocksdbConfig.RocksdbSecondaryPath,
-	)
-	if dictionaryMessage != nil {
-		dictionaryMessage.ConsoleLog()
-		panic(nil)
-	}
+	rdbClient := rocksdb.OpenRocksdb(config.RocksdbConfig)
+	lastBlock := rdbClient.GetLastBlockSynced()
 
-	lastBlock, dictionaryMessage := rdbClient.GetLastBlockSynced()
-	if dictionaryMessage != nil {
-		dictionaryMessage.ConsoleLog()
-		panic(nil)
-	}
 	// SPEC VERSION -- spec version and ranges for each spec
 	specVersionClient := specversion.NewSpecVersionClient(
-		config.ChainConfig.FirstSpecVersion,
 		lastBlock,
 		rdbClient,
 		pgClient,
 		config.ChainConfig.HttpRpcEndpoint,
 	)
 
-	specVersionsRange, dictionaryMessage := specVersionClient.Run()
-	if dictionaryMessage != nil {
-		dictionaryMessage.ConsoleLog()
-		panic(nil)
-	}
-
-	// METADATA -- meta for spec version
-	metadataClient := metadata.NewMetadataClient(
-		rdbClient,
-		config.ChainConfig.HttpRpcEndpoint,
-	)
-
-	specVersionMetadataMap, dictionaryMessage := metadataClient.GetMetadata(specVersionsRange)
-	if dictionaryMessage != nil {
-		dictionaryMessage.ConsoleLog()
-		panic(nil)
-	}
+	specVersionsRange := specVersionClient.Run()
 
 	// Register custom types
-	//TODO: file path from config file
-	c, err := ioutil.ReadFile("./network/polkadot.json")
+	c, err := ioutil.ReadFile(config.ChainConfig.DecoderTypesFile)
 	if err != nil {
 		log.Println("[ERR] Failed to register types for network Polkadot:", err)
 		return nil
@@ -102,7 +66,6 @@ func NewOrchestrator(
 		rdbClient,
 		config.ClientsConfig.Extrinsics.Workers,
 		specVersionsRange,
-		specVersionMetadataMap,
 	)
 	extrinsicClient.Run()
 
@@ -112,21 +75,18 @@ func NewOrchestrator(
 		rdbClient,
 		config.ClientsConfig.Events.Workers,
 		specVersionsRange,
-		specVersionMetadataMap,
 	)
 	eventClient.Run()
 
 	return &Orchestrator{
-		configuration:      config,
-		pgClient:           pgClient,
-		rdbClient:          rdbClient,
-		lastBlock:          lastBlock,
-		specversionClient:  specVersionClient,
-		specVersionRange:   specVersionsRange,
-		metadataClient:     metadataClient,
-		specVersionMetaMap: specVersionMetadataMap,
-		extrinsicClient:    extrinsicClient,
-		eventClient:        eventClient,
+		configuration:     config,
+		pgClient:          pgClient,
+		rdbClient:         rdbClient,
+		lastBlock:         lastBlock,
+		specversionClient: specVersionClient,
+		specVersionRange:  specVersionsRange,
+		extrinsicClient:   extrinsicClient,
+		eventClient:       eventClient,
 	}
 }
 
@@ -185,11 +145,7 @@ func (orchestrator *Orchestrator) runExtrinsics() {
 			).ConsoleLog()
 		}
 
-		lookupKey, msg := orchestrator.rdbClient.GetLookupKeyForBlockHeight(blockHeight)
-		if msg != nil {
-			msg.ConsoleLog()
-			panic(nil)
-		}
+		lookupKey := orchestrator.rdbClient.GetLookupKeyForBlockHeight(blockHeight)
 
 		extrinsicBatchChannel.SendWork(blockHeight, lookupKey)
 	}
@@ -209,21 +165,17 @@ func (orchestrator *Orchestrator) runEvents() {
 
 		if lastProcessedEvent < lastExtrinsicBlockHeight {
 			for blockHeight := lastProcessedEvent + 1; blockHeight <= lastExtrinsicBlockHeight; blockHeight++ {
-				//TODO: use event batch size
 				if blockHeight%orchestrator.configuration.ClientsConfig.Events.BatchSize == 0 {
 					eventBatchChannel.Close()
 					orchestrator.eventClient.WaitForBatchDbInsertion()
 					lastProcessedEvent = blockHeight - 1
 					eventBatchChannel = orchestrator.eventClient.StartBatch()
 					fmt.Println("Finished events up to block ", lastProcessedEvent) //dbg
+					//TODO: continue will jump over a block
 					continue
 				}
 
-				lookupKey, msg := orchestrator.rdbClient.GetLookupKeyForBlockHeight(blockHeight)
-				if msg != nil {
-					msg.ConsoleLog()
-					panic(nil)
-				}
+				lookupKey := orchestrator.rdbClient.GetLookupKeyForBlockHeight(blockHeight)
 
 				eventBatchChannel.SendWork(blockHeight, lookupKey)
 			}

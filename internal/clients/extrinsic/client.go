@@ -2,11 +2,11 @@ package extrinsic
 
 import (
 	"fmt"
-	"go-dictionary/internal/clients/metadata"
 	"go-dictionary/internal/clients/specversion"
 	"go-dictionary/internal/db/postgres"
 	"go-dictionary/internal/db/rocksdb"
 	"go-dictionary/internal/messages"
+	"strconv"
 	"strings"
 
 	scale "github.com/itering/scale.go"
@@ -16,12 +16,11 @@ import (
 
 type (
 	ExtrinsicClient struct {
-		pgClient               extrinsicRepoClient
-		rocksdbClient          *rocksdb.RockClient
-		workersCount           int
-		batchChan              chan chan *ExtrinsicJob
-		specVersions           specversion.SpecVersionRangeList
-		specVersionMetadataMap map[string]*metadata.DictionaryMetadata
+		pgClient      extrinsicRepoClient
+		rocksdbClient *rocksdb.RockClient
+		workersCount  int
+		batchChan     chan chan *ExtrinsicJob
+		specVersions  specversion.SpecVersionRangeList
 	}
 
 	extrinsicRepoClient struct {
@@ -45,7 +44,6 @@ func NewExtrinsicClient(
 	rocksdbClient *rocksdb.RockClient,
 	workersCount int,
 	specVersions specversion.SpecVersionRangeList,
-	specVersionMetadataMap map[string]*metadata.DictionaryMetadata,
 ) *ExtrinsicClient {
 
 	batchChan := make(chan chan *ExtrinsicJob, workersCount)
@@ -59,11 +57,10 @@ func NewExtrinsicClient(
 			workersCount,
 			batchFinishedChan,
 		},
-		rocksdbClient:          rocksdbClient,
-		workersCount:           workersCount,
-		batchChan:              batchChan,
-		specVersions:           specVersions,
-		specVersionMetadataMap: specVersionMetadataMap,
+		rocksdbClient: rocksdbClient,
+		workersCount:  workersCount,
+		batchChan:     batchChan,
+		specVersions:  specVersions,
 	}
 }
 
@@ -143,13 +140,7 @@ func (client *ExtrinsicClient) startWorker() {
 
 	for jobChan := range client.batchChan {
 		for job := range jobChan {
-
-			rawBodyData, msg := client.rocksdbClient.GetBodyForBlockLookupKey(job.BlockLookupKey)
-			if msg != nil {
-				msg.ConsoleLog()
-				panic(nil)
-			}
-
+			rawBodyData := client.rocksdbClient.GetBodyForBlockLookupKey(job.BlockLookupKey)
 			bodyDecoder.Init(types.ScaleBytes{Data: rawBodyData}, nil)
 			decodedBody := bodyDecoder.ProcessAndUpdateData(bodyTypeString)
 
@@ -161,14 +152,12 @@ func (client *ExtrinsicClient) startWorker() {
 					nil,
 					messages.FAILED_TYPE_ASSERTION,
 				).ConsoleLog()
-				panic(nil)
 			}
 
-			specVersion := client.specVersions.GetSpecVersionForBlock(job.BlockHeight)
-			metadata := client.specVersionMetadataMap[fmt.Sprintf("%d", specVersion)].Meta
-
+			specVersionMeta := client.specVersions.GetSpecVersionForBlock(job.BlockHeight)
+			specVersion, _ := strconv.Atoi(specVersionMeta.SpecVersion)
 			if extrinsicDecoderOption.Spec == -1 || extrinsicDecoderOption.Spec != specVersion {
-				extrinsicDecoderOption.Metadata = metadata
+				extrinsicDecoderOption.Metadata = specVersionMeta.Meta
 				extrinsicDecoderOption.Spec = specVersion
 			}
 
@@ -181,7 +170,6 @@ func (client *ExtrinsicClient) startWorker() {
 						nil,
 						messages.FAILED_TYPE_ASSERTION,
 					).ConsoleLog()
-					panic(nil)
 				}
 
 				//TODO: "init" with options only if the spec version is new
@@ -194,7 +182,7 @@ func (client *ExtrinsicClient) startWorker() {
 					Module:      getCallModule(job.BlockHeight, decodedExtrinsic),
 					Call:        getCallFunction(job.BlockHeight, decodedExtrinsic),
 					BlockHeight: job.BlockHeight,
-					Success:     true, //TODO: replace with success state from events
+					Success:     true, //the real value is get from events
 					TxHash:      getHash(job.BlockHeight, decodedExtrinsic),
 					IsSigned:    isSigned(decodedExtrinsic),
 				}
@@ -217,7 +205,6 @@ func getCallModule(blockHeight int, decodedExtrinsic map[string]interface{}) str
 			extrinsicCallModuleField,
 			blockHeight,
 		).ConsoleLog()
-		panic(nil)
 	}
 
 	return strings.ToLower(callModule)
@@ -234,7 +221,6 @@ func getCallFunction(blockHeight int, decodedExtrinsic map[string]interface{}) s
 			extrinsicFunctionField,
 			blockHeight,
 		).ConsoleLog()
-		panic(nil)
 	}
 	return callFunction
 }
@@ -242,16 +228,8 @@ func getCallFunction(blockHeight int, decodedExtrinsic map[string]interface{}) s
 func getHash(blockHeight int, decodedExtrinsic map[string]interface{}) string {
 	txHash, ok := decodedExtrinsic[extrinsicHashField].(string)
 	if !ok {
+		//TODO: calculate "hash" if not found
 		return ""
-		// messages.NewDictionaryMessage(
-		// 	messages.LOG_LEVEL_ERROR,
-		// 	messages.GetComponent(getHash),
-		// 	nil,
-		// 	messages.EXTRINSIC_FIELD_FAILED,
-		// 	extrinsicHashField,
-		// 	blockHeight,
-		// ).ConsoleLog()
-		// panic(nil)
 	}
 	return txHash
 }

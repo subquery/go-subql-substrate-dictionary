@@ -72,7 +72,6 @@ func (repoClient *extrinsicRepoClient) insertBatch(batch [][]interface{}) {
 			err,
 			messages.POSTGRES_FAILED_TO_START_TRANSACTION,
 		).ConsoleLog()
-		panic(nil)
 	}
 	defer tx.Rollback(context.Background())
 
@@ -97,7 +96,6 @@ func (repoClient *extrinsicRepoClient) insertBatch(batch [][]interface{}) {
 			err,
 			messages.POSTGRES_FAILED_TO_COPY_FROM,
 		).ConsoleLog()
-		panic(nil)
 	}
 	if copyLen != int64(len(batch)) {
 		messages.NewDictionaryMessage(
@@ -106,7 +104,6 @@ func (repoClient *extrinsicRepoClient) insertBatch(batch [][]interface{}) {
 			fmt.Errorf(messages.POSTGRES_WRONG_NUMBER_OF_COPIED_ROWS, copyLen, len(batch)),
 			"",
 		).ConsoleLog()
-		panic(nil)
 	}
 
 	err = tx.Commit(context.Background())
@@ -117,7 +114,6 @@ func (repoClient *extrinsicRepoClient) insertBatch(batch [][]interface{}) {
 			err,
 			messages.POSTGRES_FAILED_TO_COMMIT_TX,
 		).ConsoleLog()
-		panic(nil)
 	}
 }
 
@@ -146,7 +142,6 @@ func (repoClient *extrinsicRepoClient) recoverLastBlock() int {
 			err,
 			messages.EXTRINSIC_FAILED_TO_RETRIEVE_LAST_BLOCK,
 		).ConsoleLog()
-		panic(nil)
 	}
 
 	return blockHeight
