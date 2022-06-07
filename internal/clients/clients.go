@@ -10,7 +10,6 @@ import (
 	"go-dictionary/internal/db/rocksdb"
 	"go-dictionary/internal/messages"
 	"io/ioutil"
-	"log"
 	"sync/atomic"
 
 	"github.com/itering/scale.go/source"
@@ -24,7 +23,6 @@ type (
 		rdbClient         *rocksdb.RockClient
 		lastBlock         int
 		specversionClient *specversion.SpecVersionClient
-		specVersionRange  specversion.SpecVersionRangeList
 		extrinsicClient   *extrinsic.ExtrinsicClient
 		eventClient       *event.EventClient
 		extrinsicHeight   uint64
@@ -50,13 +48,17 @@ func NewOrchestrator(
 		config.ChainConfig.HttpRpcEndpoint,
 	)
 
-	specVersionsRange := specVersionClient.Run()
+	specVersionClient.Run()
 
 	// Register custom types
 	c, err := ioutil.ReadFile(config.ChainConfig.DecoderTypesFile)
 	if err != nil {
-		log.Println("[ERR] Failed to register types for network Polkadot:", err)
-		return nil
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(NewOrchestrator),
+			err,
+			messages.ORCHESTRATOR_FAILED_TO_REGISTER_CUSTOM_DECODER_TYPES,
+		).ConsoleLog()
 	}
 	types.RegCustomTypes(source.LoadTypeRegistry(c))
 
@@ -65,7 +67,7 @@ func NewOrchestrator(
 		pgClient,
 		rdbClient,
 		config.ClientsConfig.Extrinsics.Workers,
-		specVersionsRange,
+		specVersionClient,
 	)
 	extrinsicClient.Run()
 
@@ -74,7 +76,7 @@ func NewOrchestrator(
 		pgClient,
 		rdbClient,
 		config.ClientsConfig.Events.Workers,
-		specVersionsRange,
+		specVersionClient,
 	)
 	eventClient.Run()
 
@@ -84,7 +86,6 @@ func NewOrchestrator(
 		rdbClient:         rdbClient,
 		lastBlock:         lastBlock,
 		specversionClient: specVersionClient,
-		specVersionRange:  specVersionsRange,
 		extrinsicClient:   extrinsicClient,
 		eventClient:       eventClient,
 	}
@@ -101,8 +102,8 @@ func (orchestrator *Orchestrator) Run() {
 	go orchestrator.runExtrinsics()
 	go orchestrator.runEvents()
 
-	for {
-	}
+	c := make(chan struct{})
+	<-c
 }
 
 func (orchestrator *Orchestrator) runExtrinsics() {

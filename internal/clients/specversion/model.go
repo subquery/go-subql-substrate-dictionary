@@ -27,7 +27,7 @@ func (specVersionRangeList SpecVersionRangeList) FillLast(lastIndexedBlock int) 
 }
 
 // GetSpecVersionForBlock receives a block height and returns it's spec version
-func (specVersionRangeList SpecVersionRangeList) GetSpecVersionForBlock(blockHeight int) *SpecVersionRange {
+func (specVersionRangeList SpecVersionRangeList) getSpecVersionForBlock(blockHeight int) *SpecVersionRange {
 	for idx, spec := range specVersionRangeList {
 		if blockHeight >= spec.First && blockHeight <= spec.Last {
 			return &specVersionRangeList[idx]
@@ -35,7 +35,7 @@ func (specVersionRangeList SpecVersionRangeList) GetSpecVersionForBlock(blockHei
 	}
 	messages.NewDictionaryMessage(
 		messages.LOG_LEVEL_ERROR,
-		messages.GetComponent(specVersionRangeList.GetSpecVersionForBlock),
+		messages.GetComponent(specVersionRangeList.getSpecVersionForBlock),
 		nil,
 		messages.SPEC_VERSION_WRONG_BLOCK,
 		blockHeight,

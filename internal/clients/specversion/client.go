@@ -21,10 +21,12 @@ import (
 
 type (
 	SpecVersionClient struct {
-		lastBlock     int //last indexed block by the node we interrogate
-		rocksdbClient *rocksdb.RockClient
-		pgClient      specvRepoClient
-		httpEndpoint  string
+		sync.RWMutex
+		lastBlock            int //last indexed block by the node we interrogate
+		rocksdbClient        *rocksdb.RockClient
+		pgClient             specvRepoClient
+		httpEndpoint         string
+		specVersionRangeList SpecVersionRangeList
 	}
 
 	specvRepoClient struct {
@@ -53,7 +55,8 @@ func NewSpecVersionClient(
 	}
 }
 
-func (specVClient *SpecVersionClient) Run() SpecVersionRangeList {
+// Run initializes the spec version client; it should be executed before running any other client
+func (specVClient *SpecVersionClient) Run() {
 	var (
 		lastBlockForCurrentRange int // the last block of the current searched spec version
 		actualLastBlock          int
@@ -64,7 +67,6 @@ func (specVClient *SpecVersionClient) Run() SpecVersionRangeList {
 		isDataInDb               bool
 		wg                       sync.WaitGroup
 	)
-	specList := SpecVersionRangeList{}
 	insertPosition := 0
 	shouldInsert := false
 
@@ -78,15 +80,15 @@ func (specVClient *SpecVersionClient) Run() SpecVersionRangeList {
 			nil,
 			messages.SPEC_VERSION_RECOVERED,
 		).ConsoleLog()
-		specList = specVClient.pgClient.getAllSpecVersionData()
-		specList.FillLast(specVClient.lastBlock)
-		insertPosition = len(specList)
+		specVClient.specVersionRangeList = specVClient.pgClient.getAllSpecVersionData()
+		specVClient.specVersionRangeList.FillLast(specVClient.lastBlock)
+		insertPosition = len(specVClient.specVersionRangeList)
 
-		wg.Add(len(specList))
-		for i := 0; i < len(specList); i++ {
+		wg.Add(len(specVClient.specVersionRangeList))
+		for i := 0; i < len(specVClient.specVersionRangeList); i++ {
 			go func(idx int) {
 				defer wg.Done()
-				specList[idx].Meta = specVClient.getMetadata(specList[idx].First)
+				specVClient.specVersionRangeList[idx].Meta = specVClient.getMetadata(specVClient.specVersionRangeList[idx].First)
 			}(i)
 		}
 		wg.Wait()
@@ -100,7 +102,7 @@ func (specVClient *SpecVersionClient) Run() SpecVersionRangeList {
 			nil,
 			messages.SPEC_VERSION_UP_TO_DATE,
 		).ConsoleLog()
-		return specList
+		return
 	}
 
 	start = lastSavedDbBlockInfo.First // start getting spec version info from the first block of the last range saved in db
@@ -125,12 +127,12 @@ func (specVClient *SpecVersionClient) Run() SpecVersionRangeList {
 		}
 
 		currentSpecVersionString := fmt.Sprintf("%d", currentSpecVersion)
-		if len(specList) == 0 || specList[len(specList)-1].SpecVersion != currentSpecVersionString {
+		if len(specVClient.specVersionRangeList) == 0 || specVClient.specVersionRangeList[len(specVClient.specVersionRangeList)-1].SpecVersion != currentSpecVersionString {
 			first := firstChainBlock
-			if len(specList) != 0 {
-				first = specList[len(specList)-1].Last + 1
+			if len(specVClient.specVersionRangeList) != 0 {
+				first = specVClient.specVersionRangeList[len(specVClient.specVersionRangeList)-1].Last + 1
 			}
-			specList = append(specList, SpecVersionRange{
+			specVClient.specVersionRangeList = append(specVClient.specVersionRangeList, SpecVersionRange{
 				Last:        actualLastBlock,
 				First:       first,
 				SpecVersion: currentSpecVersionString,
@@ -138,7 +140,7 @@ func (specVClient *SpecVersionClient) Run() SpecVersionRangeList {
 			})
 			shouldInsert = true
 		} else {
-			specList[len(specList)-1].Last = actualLastBlock
+			specVClient.specVersionRangeList[len(specVClient.specVersionRangeList)-1].Last = actualLastBlock
 		}
 
 		messages.NewDictionaryMessage(
@@ -157,10 +159,8 @@ func (specVClient *SpecVersionClient) Run() SpecVersionRangeList {
 	}
 
 	if shouldInsert {
-		specVClient.pgClient.insertSpecVersionsList(specList[insertPosition:])
+		specVClient.pgClient.insertSpecVersionsList(specVClient.specVersionRangeList[insertPosition:])
 	}
-
-	return specList
 }
 
 // GetSpecVersion downloads the spec version for a block using the HTTP RPC endpoint
@@ -306,4 +306,20 @@ func (specVClient *SpecVersionClient) getMetadata(blockHeight int) *types.Metada
 	}
 
 	return &metaDecoder.Metadata
+}
+
+// GetSpecVersionAndMetadata returns the spec version and the metadata for a given block height
+func (specVClient *SpecVersionClient) GetSpecVersionAndMetadata(blockHeight int) *SpecVersionRange {
+	specVClient.RLock()
+	defer specVClient.RUnlock()
+	return specVClient.specVersionRangeList.getSpecVersionForBlock(blockHeight)
+}
+
+// UpdateLive updates the spec version and metadata in live mode
+func (specVClient *SpecVersionClient) UpdateLive(lastBlock int) {
+	if lastBlock <= specVClient.lastBlock {
+		return
+	}
+
+	//TODO: get spec version for current range while currentRangeLastBlock!=lastBlock
 }

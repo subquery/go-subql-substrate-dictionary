@@ -20,11 +20,11 @@ import (
 
 type (
 	EventClient struct {
-		pgClient      eventRepoClient
-		rocksdbClient *rocksdb.RockClient
-		workersCount  int
-		batchChan     chan chan *eventJob
-		specVersions  specversion.SpecVersionRangeList
+		pgClient          eventRepoClient
+		rocksdbClient     *rocksdb.RockClient
+		workersCount      int
+		batchChan         chan chan *eventJob
+		specVersionClient *specversion.SpecVersionClient
 	}
 
 	eventRepoClient struct {
@@ -43,7 +43,7 @@ func NewEventClient(
 	pgClient *postgres.PostgresClient,
 	rocksdbClient *rocksdb.RockClient,
 	workersCount int,
-	specVersions specversion.SpecVersionRangeList,
+	specVersionClient *specversion.SpecVersionClient,
 ) *EventClient {
 	batchChan := make(chan chan *eventJob, workersCount)
 	dbChan := make(chan *Event, workersCount)
@@ -56,10 +56,10 @@ func NewEventClient(
 			workersCount,
 			batchFinishedChan,
 		},
-		rocksdbClient: rocksdbClient,
-		workersCount:  workersCount,
-		batchChan:     batchChan,
-		specVersions:  specVersions,
+		rocksdbClient:     rocksdbClient,
+		workersCount:      workersCount,
+		batchChan:         batchChan,
+		specVersionClient: specVersionClient,
 	}
 }
 
@@ -136,7 +136,7 @@ func (client *EventClient) startWorker() {
 			stateRootKey := getStateRootFromRawHeader(decodedHeader)
 			rawEvents := client.readRawEvent(stateRootKey)
 
-			specVersionMeta := client.specVersions.GetSpecVersionForBlock(job.BlockHeight)
+			specVersionMeta := client.specVersionClient.GetSpecVersionAndMetadata(job.BlockHeight)
 			specVersion, _ := strconv.Atoi(specVersionMeta.SpecVersion)
 			if eventDecoderOption.Spec == -1 || eventDecoderOption.Spec != specVersion {
 				eventDecoderOption.Metadata = specVersionMeta.Meta

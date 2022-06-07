@@ -16,11 +16,11 @@ import (
 
 type (
 	ExtrinsicClient struct {
-		pgClient      extrinsicRepoClient
-		rocksdbClient *rocksdb.RockClient
-		workersCount  int
-		batchChan     chan chan *ExtrinsicJob
-		specVersions  specversion.SpecVersionRangeList
+		pgClient          extrinsicRepoClient
+		rocksdbClient     *rocksdb.RockClient
+		workersCount      int
+		batchChan         chan chan *ExtrinsicJob
+		specVersionClient *specversion.SpecVersionClient
 	}
 
 	extrinsicRepoClient struct {
@@ -43,7 +43,7 @@ func NewExtrinsicClient(
 	pgClient *postgres.PostgresClient,
 	rocksdbClient *rocksdb.RockClient,
 	workersCount int,
-	specVersions specversion.SpecVersionRangeList,
+	specVersionClient *specversion.SpecVersionClient,
 ) *ExtrinsicClient {
 
 	batchChan := make(chan chan *ExtrinsicJob, workersCount)
@@ -57,10 +57,10 @@ func NewExtrinsicClient(
 			workersCount,
 			batchFinishedChan,
 		},
-		rocksdbClient: rocksdbClient,
-		workersCount:  workersCount,
-		batchChan:     batchChan,
-		specVersions:  specVersions,
+		rocksdbClient:     rocksdbClient,
+		workersCount:      workersCount,
+		batchChan:         batchChan,
+		specVersionClient: specVersionClient,
 	}
 }
 
@@ -154,7 +154,7 @@ func (client *ExtrinsicClient) startWorker() {
 				).ConsoleLog()
 			}
 
-			specVersionMeta := client.specVersions.GetSpecVersionForBlock(job.BlockHeight)
+			specVersionMeta := client.specVersionClient.GetSpecVersionAndMetadata(job.BlockHeight)
 			specVersion, _ := strconv.Atoi(specVersionMeta.SpecVersion)
 			if extrinsicDecoderOption.Spec == -1 || extrinsicDecoderOption.Spec != specVersion {
 				extrinsicDecoderOption.Metadata = specVersionMeta.Meta
