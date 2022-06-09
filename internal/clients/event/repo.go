@@ -128,7 +128,6 @@ func (repoClient *eventRepoClient) insertBatch(
 
 	}
 	batchResults := tx.SendBatch(context.Background(), extrinsicUpdateBatch)
-	defer batchResults.Close()
 	commandTag, err := batchResults.Exec()
 	if err != nil {
 		messages.NewDictionaryMessage(

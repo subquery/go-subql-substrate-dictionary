@@ -38,7 +38,13 @@ type RockClient struct {
 
 // OpenRocksdb connect to the rocksdb instance indicated by a path argument
 func OpenRocksdb(config config.RocksdbConfig) *RockClient {
-	messages.NewDictionaryMessage(messages.LOG_LEVEL_INFO, "", nil, messages.ROCKSDB_CONNECTING, config.RocksdbPath).ConsoleLog()
+	messages.NewDictionaryMessage(
+		messages.LOG_LEVEL_INFO,
+		"",
+		nil,
+		messages.ROCKSDB_CONNECTING,
+		config.RocksdbPath,
+	).ConsoleLog()
 	opts := grocksdb.NewDefaultOptions()
 	opts.SetMaxOpenFiles(-1)
 	ro := grocksdb.NewDefaultReadOptions()
@@ -200,6 +206,19 @@ func (rc *RockClient) GetHeaderForBlockLookupKey(key []byte) []byte {
 	returnedHeader = append(returnedHeader, header.Data()...)
 
 	return returnedHeader
+}
+
+// CatchUpWithPrimary is used to synchronize the secondary rocksdb instance with the primary/live instance
+func (rc *RockClient) CatchUpWithPrimary() {
+	err := rc.db.TryCatchUpWithPrimary()
+	if err != nil {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(rc.CatchUpWithPrimary),
+			err,
+			messages.ROCKSDB_FAILED_TO_UPDATE_SECONDARY,
+		).ConsoleLog()
+	}
 }
 
 func (rc *RockClient) Close() {

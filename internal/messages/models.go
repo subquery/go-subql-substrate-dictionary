@@ -35,6 +35,7 @@ var (
 	ROCKSDB_FAILED_TO_GET_LAST_SYNCED_BLOCK = "Failed to get last synced block"
 	ROCKSDB_FAILED_BODY                     = "Failed to retrieve block body from rocksdb"
 	ROCKSDB_FAILED_HEADER                   = "Failed to retrieve block header from rocksdb"
+	ROCKSDB_FAILED_TO_UPDATE_SECONDARY      = "Failed to synchronize secondary rocksdb instance with primary"
 
 	// postgres
 	POSTGRES_CONNECTING                        = "Connecting to postgres database using '%s'"

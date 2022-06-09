@@ -21,7 +21,7 @@ type (
 		configuration     config.Config
 		pgClient          *postgres.PostgresClient
 		rdbClient         *rocksdb.RockClient
-		lastBlock         int
+		lastBlockChan     chan int
 		specversionClient *specversion.SpecVersionClient
 		extrinsicClient   *extrinsic.ExtrinsicClient
 		eventClient       *event.EventClient
@@ -47,7 +47,6 @@ func NewOrchestrator(
 		pgClient,
 		config.ChainConfig.HttpRpcEndpoint,
 	)
-
 	specVersionClient.Run()
 
 	// Register custom types
@@ -80,11 +79,12 @@ func NewOrchestrator(
 	)
 	eventClient.Run()
 
+	lastBlockChan := make(chan int)
 	return &Orchestrator{
 		configuration:     config,
 		pgClient:          pgClient,
 		rdbClient:         rdbClient,
-		lastBlock:         lastBlock,
+		lastBlockChan:     lastBlockChan,
 		specversionClient: specVersionClient,
 		extrinsicClient:   extrinsicClient,
 		eventClient:       eventClient,
@@ -121,39 +121,44 @@ func (orchestrator *Orchestrator) runExtrinsics() {
 
 	atomic.StoreUint64(&orchestrator.extrinsicHeight, uint64(startingBlock))
 
-	for blockHeight := startingBlock + 1; blockHeight <= orchestrator.lastBlock; blockHeight++ {
-		if blockHeight%orchestrator.configuration.ClientsConfig.Extrinsics.BatchSize == 0 {
-			extrinsicBatchChannel.Close()
-			orchestrator.extrinsicClient.WaitForBatchDbInsertion()
-			atomic.StoreUint64(&orchestrator.extrinsicHeight, uint64(blockHeight-1))
+	for {
+		lastBlock := orchestrator.getLastSyncedBlock()
+		for blockHeight := startingBlock + 1; blockHeight <= lastBlock; blockHeight++ {
+			if blockHeight%orchestrator.configuration.ClientsConfig.Extrinsics.BatchSize == 0 {
+				extrinsicBatchChannel.Close()
+				orchestrator.extrinsicClient.WaitForBatchDbInsertion()
+				atomic.StoreUint64(&orchestrator.extrinsicHeight, uint64(blockHeight-1))
 
-			messages.NewDictionaryMessage(
-				messages.LOG_LEVEL_SUCCESS,
-				"",
-				nil,
-				messages.ORCHESTRATOR_FINISH_EXTRINSIC_BATCH,
-			).ConsoleLog()
+				messages.NewDictionaryMessage(
+					messages.LOG_LEVEL_SUCCESS,
+					"",
+					nil,
+					messages.ORCHESTRATOR_FINISH_EXTRINSIC_BATCH,
+				).ConsoleLog()
 
-			extrinsicBatchChannel = orchestrator.extrinsicClient.StartBatch()
+				extrinsicBatchChannel = orchestrator.extrinsicClient.StartBatch()
 
-			messages.NewDictionaryMessage(
-				messages.LOG_LEVEL_INFO,
-				"",
-				nil,
-				messages.ORCHESTRATOR_START_EXTRINSIC_BATCH,
-				orchestrator.configuration.ClientsConfig.Extrinsics.BatchSize,
-				blockHeight,
-			).ConsoleLog()
+				messages.NewDictionaryMessage(
+					messages.LOG_LEVEL_INFO,
+					"",
+					nil,
+					messages.ORCHESTRATOR_START_EXTRINSIC_BATCH,
+					orchestrator.configuration.ClientsConfig.Extrinsics.BatchSize,
+					blockHeight,
+				).ConsoleLog()
+			}
+
+			lookupKey := orchestrator.rdbClient.GetLookupKeyForBlockHeight(blockHeight)
+			extrinsicBatchChannel.SendWork(blockHeight, lookupKey)
 		}
 
-		lookupKey := orchestrator.rdbClient.GetLookupKeyForBlockHeight(blockHeight)
-
-		extrinsicBatchChannel.SendWork(blockHeight, lookupKey)
+		extrinsicBatchChannel.Close()
+		orchestrator.extrinsicClient.WaitForBatchDbInsertion()
+		fmt.Println("Finished EXTRINSICS up to", lastBlock) //dbg
+		atomic.StoreUint64(&orchestrator.extrinsicHeight, uint64(lastBlock))
+		startingBlock = lastBlock
+		extrinsicBatchChannel = orchestrator.extrinsicClient.StartBatch()
 	}
-
-	//TODO: show some messages
-	extrinsicBatchChannel.Close()
-	orchestrator.extrinsicClient.WaitForBatchDbInsertion()
 }
 
 func (orchestrator *Orchestrator) runEvents() {
@@ -163,29 +168,28 @@ func (orchestrator *Orchestrator) runEvents() {
 
 	for {
 		lastExtrinsicBlockHeight = int(atomic.LoadUint64(&orchestrator.extrinsicHeight))
-
-		if lastProcessedEvent < lastExtrinsicBlockHeight {
-			for blockHeight := lastProcessedEvent + 1; blockHeight <= lastExtrinsicBlockHeight; blockHeight++ {
-				if blockHeight%orchestrator.configuration.ClientsConfig.Events.BatchSize == 0 {
-					eventBatchChannel.Close()
-					orchestrator.eventClient.WaitForBatchDbInsertion()
-					lastProcessedEvent = blockHeight - 1
-					eventBatchChannel = orchestrator.eventClient.StartBatch()
-					fmt.Println("Finished events up to block ", lastProcessedEvent) //dbg
-					//TODO: continue will jump over a block
-					continue
-				}
-
-				lookupKey := orchestrator.rdbClient.GetLookupKeyForBlockHeight(blockHeight)
-
-				eventBatchChannel.SendWork(blockHeight, lookupKey)
-			}
-
-			eventBatchChannel.Close()
-			orchestrator.eventClient.WaitForBatchDbInsertion()
-			lastProcessedEvent = lastExtrinsicBlockHeight
-			eventBatchChannel = orchestrator.eventClient.StartBatch()
+		if lastExtrinsicBlockHeight <= lastProcessedEvent {
+			continue
 		}
+
+		for blockHeight := lastProcessedEvent + 1; blockHeight <= lastExtrinsicBlockHeight; blockHeight++ {
+			lookupKey := orchestrator.rdbClient.GetLookupKeyForBlockHeight(blockHeight)
+			eventBatchChannel.SendWork(blockHeight, lookupKey)
+
+			if blockHeight%orchestrator.configuration.ClientsConfig.Events.BatchSize == 0 {
+				eventBatchChannel.Close()
+				orchestrator.eventClient.WaitForBatchDbInsertion()
+				lastProcessedEvent = blockHeight
+				eventBatchChannel = orchestrator.eventClient.StartBatch()
+				fmt.Println("Finished events up to ", blockHeight) //dbg
+				continue
+			}
+		}
+
+		eventBatchChannel.Close()
+		orchestrator.eventClient.WaitForBatchDbInsertion()
+		lastProcessedEvent = lastExtrinsicBlockHeight
+		eventBatchChannel = orchestrator.eventClient.StartBatch()
 	}
 }
 
@@ -199,4 +203,12 @@ func (orchestrator *Orchestrator) Close() {
 
 	orchestrator.rdbClient.Close()
 	orchestrator.pgClient.Close()
+}
+
+func (orchestrator *Orchestrator) getLastSyncedBlock() int {
+	orchestrator.rdbClient.CatchUpWithPrimary()
+	lastBlock := orchestrator.rdbClient.GetLastBlockSynced()
+	//TODO: modify update live to  work properly
+	orchestrator.specversionClient.UpdateLive(lastBlock)
+	return lastBlock
 }

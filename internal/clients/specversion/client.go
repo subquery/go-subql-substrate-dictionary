@@ -65,7 +65,6 @@ func (specVClient *SpecVersionClient) Run() {
 		lastSavedDbBlockInfo     *SpecVersionRange
 		err                      error
 		isDataInDb               bool
-		wg                       sync.WaitGroup
 	)
 	insertPosition := 0
 	shouldInsert := false
@@ -84,14 +83,9 @@ func (specVClient *SpecVersionClient) Run() {
 		specVClient.specVersionRangeList.FillLast(specVClient.lastBlock)
 		insertPosition = len(specVClient.specVersionRangeList)
 
-		wg.Add(len(specVClient.specVersionRangeList))
 		for i := 0; i < len(specVClient.specVersionRangeList); i++ {
-			go func(idx int) {
-				defer wg.Done()
-				specVClient.specVersionRangeList[idx].Meta = specVClient.getMetadata(specVClient.specVersionRangeList[idx].First)
-			}(i)
+			specVClient.specVersionRangeList[i].Meta = specVClient.getMetadata(specVClient.specVersionRangeList[i].First)
 		}
-		wg.Wait()
 	}
 
 	// if last block in db is equal to last block indexed by node, simply return the info about the blocks in db
@@ -263,7 +257,7 @@ func (specVClient *SpecVersionClient) getAllDbSpecVersions() SpecVersionRangeLis
 	return specVersions
 }
 
-// getMetadata retrieves the metadata instant for a block height
+// getMetadata retrieves the metadata structure for a block height
 func (specVClient *SpecVersionClient) getMetadata(blockHeight int) *types.MetadataStruct {
 	hash := specVClient.rocksdbClient.GetBlockHash(blockHeight)
 	reqBody := bytes.NewBuffer([]byte(rpc.StateGetMetadata(1, hash)))
@@ -321,5 +315,62 @@ func (specVClient *SpecVersionClient) UpdateLive(lastBlock int) {
 		return
 	}
 
-	//TODO: get spec version for current range while currentRangeLastBlock!=lastBlock
+	var (
+		actualLastBlock int
+		shouldInsert    bool
+	)
+	insertPosition := len(specVClient.specVersionRangeList)
+
+	lastSavedBlockInfo := specVClient.specVersionRangeList[len(specVClient.specVersionRangeList)-1]
+	lastBlockForCurrentRange := lastSavedBlockInfo.Last
+	start := lastBlockForCurrentRange
+	currentSpecVersion, err := strconv.Atoi(lastSavedBlockInfo.SpecVersion)
+	if err != nil {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(specVClient.Run),
+			err,
+			messages.FAILED_ATOI,
+		).ConsoleLog()
+	}
+
+	for lastBlockForCurrentRange != lastBlock {
+		lastBlockForCurrentRange = specVClient.getLastBlockForSpecVersion(currentSpecVersion, start, specVClient.lastBlock)
+
+		if lastBlockForCurrentRange != specVClient.lastBlock {
+			actualLastBlock = lastBlockForCurrentRange + 1
+		} else {
+			actualLastBlock = lastBlockForCurrentRange
+		}
+
+		currentSpecVersionString := fmt.Sprintf("%d", currentSpecVersion)
+		specVClient.Lock()
+		if len(specVClient.specVersionRangeList) == 0 || specVClient.specVersionRangeList[len(specVClient.specVersionRangeList)-1].SpecVersion != currentSpecVersionString {
+			first := firstChainBlock
+			if len(specVClient.specVersionRangeList) != 0 {
+				first = specVClient.specVersionRangeList[len(specVClient.specVersionRangeList)-1].Last + 1
+			}
+			specVClient.specVersionRangeList = append(specVClient.specVersionRangeList, SpecVersionRange{
+				Last:        actualLastBlock,
+				First:       first,
+				SpecVersion: currentSpecVersionString,
+				Meta:        specVClient.getMetadata(first),
+			})
+			shouldInsert = true
+		} else {
+			specVClient.specVersionRangeList[len(specVClient.specVersionRangeList)-1].Last = actualLastBlock
+		}
+		specVClient.Unlock()
+
+		if lastBlockForCurrentRange != specVClient.lastBlock {
+			start = lastBlockForCurrentRange + 1
+			currentSpecVersion = specVClient.getSpecVersion(start)
+		}
+	}
+
+	if shouldInsert {
+		specVClient.RLock()
+		specVClient.pgClient.insertSpecVersionsList(specVClient.specVersionRangeList[insertPosition:])
+		specVClient.RUnlock()
+	}
 }
