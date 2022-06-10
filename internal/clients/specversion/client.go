@@ -335,9 +335,9 @@ func (specVClient *SpecVersionClient) UpdateLive(lastBlock int) {
 	}
 
 	for lastBlockForCurrentRange != lastBlock {
-		lastBlockForCurrentRange = specVClient.getLastBlockForSpecVersion(currentSpecVersion, start, specVClient.lastBlock)
+		lastBlockForCurrentRange = specVClient.getLastBlockForSpecVersion(currentSpecVersion, start, lastBlock)
 
-		if lastBlockForCurrentRange != specVClient.lastBlock {
+		if lastBlockForCurrentRange != lastBlock {
 			actualLastBlock = lastBlockForCurrentRange + 1
 		} else {
 			actualLastBlock = lastBlockForCurrentRange
@@ -362,7 +362,7 @@ func (specVClient *SpecVersionClient) UpdateLive(lastBlock int) {
 		}
 		specVClient.Unlock()
 
-		if lastBlockForCurrentRange != specVClient.lastBlock {
+		if lastBlockForCurrentRange != lastBlock {
 			start = lastBlockForCurrentRange + 1
 			currentSpecVersion = specVClient.getSpecVersion(start)
 		}

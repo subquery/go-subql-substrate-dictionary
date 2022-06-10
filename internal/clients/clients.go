@@ -154,7 +154,6 @@ func (orchestrator *Orchestrator) runExtrinsics() {
 
 		extrinsicBatchChannel.Close()
 		orchestrator.extrinsicClient.WaitForBatchDbInsertion()
-		fmt.Println("Finished EXTRINSICS up to", lastBlock) //dbg
 		atomic.StoreUint64(&orchestrator.extrinsicHeight, uint64(lastBlock))
 		startingBlock = lastBlock
 		extrinsicBatchChannel = orchestrator.extrinsicClient.StartBatch()
@@ -186,10 +185,12 @@ func (orchestrator *Orchestrator) runEvents() {
 			}
 		}
 
-		eventBatchChannel.Close()
-		orchestrator.eventClient.WaitForBatchDbInsertion()
-		lastProcessedEvent = lastExtrinsicBlockHeight
-		eventBatchChannel = orchestrator.eventClient.StartBatch()
+		if lastExtrinsicBlockHeight%orchestrator.configuration.ClientsConfig.Events.BatchSize != 0 {
+			eventBatchChannel.Close()
+			orchestrator.eventClient.WaitForBatchDbInsertion()
+			lastProcessedEvent = lastExtrinsicBlockHeight
+			eventBatchChannel = orchestrator.eventClient.StartBatch()
+		}
 	}
 }
 
