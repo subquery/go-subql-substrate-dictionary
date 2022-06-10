@@ -56,7 +56,7 @@ func NewOrchestrator(
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(NewOrchestrator),
 			err,
-			messages.ORCHESTRATOR_FAILED_TO_REGISTER_CUSTOM_DECODER_TYPES,
+			ORCHESTRATOR_FAILED_TO_REGISTER_CUSTOM_DECODER_TYPES,
 		).ConsoleLog()
 	}
 	types.RegCustomTypes(source.LoadTypeRegistry(c))
@@ -96,7 +96,7 @@ func (orchestrator *Orchestrator) Run() {
 		messages.LOG_LEVEL_INFO,
 		"",
 		nil,
-		messages.ORCHESTRATOR_START,
+		ORCHESTRATOR_START,
 	).ConsoleLog()
 
 	go orchestrator.runExtrinsics()
@@ -114,7 +114,7 @@ func (orchestrator *Orchestrator) runExtrinsics() {
 		messages.LOG_LEVEL_INFO,
 		"",
 		nil,
-		messages.ORCHESTRATOR_START_EXTRINSIC_BATCH,
+		ORCHESTRATOR_START_EXTRINSIC_BATCH,
 		orchestrator.configuration.ClientsConfig.Extrinsics.BatchSize,
 		startingBlock,
 	).ConsoleLog()
@@ -133,7 +133,7 @@ func (orchestrator *Orchestrator) runExtrinsics() {
 					messages.LOG_LEVEL_SUCCESS,
 					"",
 					nil,
-					messages.ORCHESTRATOR_FINISH_EXTRINSIC_BATCH,
+					ORCHESTRATOR_FINISH_EXTRINSIC_BATCH,
 				).ConsoleLog()
 
 				extrinsicBatchChannel = orchestrator.extrinsicClient.StartBatch()
@@ -142,7 +142,7 @@ func (orchestrator *Orchestrator) runExtrinsics() {
 					messages.LOG_LEVEL_INFO,
 					"",
 					nil,
-					messages.ORCHESTRATOR_START_EXTRINSIC_BATCH,
+					ORCHESTRATOR_START_EXTRINSIC_BATCH,
 					orchestrator.configuration.ClientsConfig.Extrinsics.BatchSize,
 					blockHeight,
 				).ConsoleLog()
@@ -199,7 +199,7 @@ func (orchestrator *Orchestrator) Close() {
 		messages.LOG_LEVEL_INFO,
 		"",
 		nil,
-		messages.ORCHESTRATOR_CLOSE,
+		ORCHESTRATOR_CLOSE,
 	).ConsoleLog()
 
 	orchestrator.rdbClient.Close()
@@ -209,7 +209,7 @@ func (orchestrator *Orchestrator) Close() {
 func (orchestrator *Orchestrator) getLastSyncedBlock() int {
 	orchestrator.rdbClient.CatchUpWithPrimary()
 	lastBlock := orchestrator.rdbClient.GetLastBlockSynced()
-	//TODO: modify update live to  work properly
+	//TODO: updatelive only if last synced block is different from the last processed block
 	orchestrator.specversionClient.UpdateLive(lastBlock)
 	return lastBlock
 }

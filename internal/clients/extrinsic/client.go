@@ -70,7 +70,7 @@ func (client *ExtrinsicClient) Run() {
 		messages.LOG_LEVEL_INFO,
 		"",
 		nil,
-		messages.EXTRINSIC_CLIENT_STARTING,
+		EXTRINSIC_CLIENT_STARTING,
 		client.workersCount,
 	).ConsoleLog()
 
@@ -113,7 +113,7 @@ func (client *ExtrinsicClient) RecoverLastInsertedBlock() int {
 			messages.LOG_LEVEL_INFO,
 			"",
 			nil,
-			messages.EXTRINSICS_NO_PREVIOUS_WORK,
+			EXTRINSICS_NO_PREVIOUS_WORK,
 		).ConsoleLog()
 		return 1
 	}
@@ -201,7 +201,7 @@ func getCallModule(blockHeight int, decodedExtrinsic map[string]interface{}) str
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(getCallModule),
 			nil,
-			messages.EXTRINSIC_FIELD_FAILED,
+			EXTRINSIC_FIELD_FAILED,
 			extrinsicCallModuleField,
 			blockHeight,
 		).ConsoleLog()
@@ -217,7 +217,7 @@ func getCallFunction(blockHeight int, decodedExtrinsic map[string]interface{}) s
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(getCallFunction),
 			nil,
-			messages.EXTRINSIC_FIELD_FAILED,
+			EXTRINSIC_FIELD_FAILED,
 			extrinsicFunctionField,
 			blockHeight,
 		).ConsoleLog()

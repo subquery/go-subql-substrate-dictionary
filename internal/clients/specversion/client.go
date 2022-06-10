@@ -77,7 +77,7 @@ func (specVClient *SpecVersionClient) Run() {
 			messages.LOG_LEVEL_INFO,
 			"",
 			nil,
-			messages.SPEC_VERSION_RECOVERED,
+			SPEC_VERSION_RECOVERED,
 		).ConsoleLog()
 		specVClient.specVersionRangeList = specVClient.pgClient.getAllSpecVersionData()
 		specVClient.specVersionRangeList.FillLast(specVClient.lastBlock)
@@ -94,7 +94,7 @@ func (specVClient *SpecVersionClient) Run() {
 			messages.LOG_LEVEL_INFO,
 			"",
 			nil,
-			messages.SPEC_VERSION_UP_TO_DATE,
+			SPEC_VERSION_UP_TO_DATE,
 		).ConsoleLog()
 		return
 	}
@@ -141,7 +141,7 @@ func (specVClient *SpecVersionClient) Run() {
 			messages.LOG_LEVEL_INFO,
 			"",
 			nil,
-			messages.SPEC_VERSION_RETRIEVED,
+			SPEC_VERSION_RETRIEVED,
 			currentSpecVersion,
 			actualLastBlock,
 		).ConsoleLog()
@@ -168,7 +168,7 @@ func (specVClient *SpecVersionClient) getSpecVersion(height int) int {
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(specVClient.getSpecVersion),
 			postErr,
-			messages.SPEC_VERSION_FAILED_POST_MESSAGE,
+			SPEC_VERSION_FAILED_POST_MESSAGE,
 			height,
 		).ConsoleLog()
 	}
@@ -180,7 +180,7 @@ func (specVClient *SpecVersionClient) getSpecVersion(height int) int {
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(specVClient.getSpecVersion),
 			jsonDecodeErr,
-			messages.SPEC_VERSION_FAILED_TO_DECODE,
+			SPEC_VERSION_FAILED_TO_DECODE,
 			height,
 		).ConsoleLog()
 	}
@@ -267,7 +267,7 @@ func (specVClient *SpecVersionClient) getMetadata(blockHeight int) *types.Metada
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(specVClient.getMetadata),
 			err,
-			messages.META_FAILED_POST_MESSAGE,
+			META_FAILED_POST_MESSAGE,
 			blockHeight,
 		).ConsoleLog()
 	}
@@ -281,7 +281,7 @@ func (specVClient *SpecVersionClient) getMetadata(blockHeight int) *types.Metada
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(specVClient.getMetadata),
 			err,
-			messages.META_FAILED_TO_DECODE_BODY,
+			META_FAILED_TO_DECODE_BODY,
 			blockHeight,
 		).ConsoleLog()
 	}
@@ -294,7 +294,7 @@ func (specVClient *SpecVersionClient) getMetadata(blockHeight int) *types.Metada
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(specVClient.getMetadata),
 			err,
-			messages.META_FAILED_SCALE_DECODE,
+			META_FAILED_SCALE_DECODE,
 			blockHeight,
 		).ConsoleLog()
 	}

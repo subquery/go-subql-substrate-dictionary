@@ -6,6 +6,28 @@ import (
 	"github.com/itering/scale.go/types"
 )
 
+const (
+	// spec version messages
+	SPEC_VERSION_FAILED_POST_MESSAGE  = "Failed to get spec version from HTTP endpoint for block %d"
+	SPEC_VERSION_FAILED_TO_DECODE     = "Failed to decode spec version for block %d"
+	SPEC_VERSION_FAILED_DB_LAST_BLOCK = "Failed to get last spec version block from db"
+	SPEC_VERSION_FAILED_DB            = "Failed to get spec version info from db"
+	SPEC_VERSION_RETRIEVED            = "Last block height for spec version %d is %d"
+	SPEC_VERSION_DB_INSERT            = "Inserting spec verion data in db starting from block %d"
+	SPEC_VERSION_DB_SUCCESS           = "Successfully inserted spec version info in db"
+	SPEC_VERSION_UP_TO_DATE           = "Spec versions saved in db are up to date"
+	SPEC_VERSION_NO_PREVIOUS_WORK     = "No spec version info was saved from previous executions"
+	SPEC_VERSION_RECOVERED            = "Spec version recovered from last run"
+	SPEC_VERSION_WRONG_BLOCK          = "Cannot get spec version for block %d"
+
+	// metadata messages
+	META_FAILED_POST_MESSAGE   = "Failed to get metadata from HTTP endpoint for block %d"
+	META_FAILED_TO_DECODE_BODY = "Failed to decode metadata body into a string for block %d"
+	META_FAILED_SCALE_DECODE   = "Failed to scale decode metadata for block %d"
+	META_STARTING              = "Metadata info is retrieved from the rpc endpoint"
+	META_FINISHED              = "Metadata client successfully finished processing"
+)
+
 type (
 	SpecVersionRange struct {
 		SpecVersion string `json:"spec_version"`
@@ -37,7 +59,7 @@ func (specVersionRangeList SpecVersionRangeList) getSpecVersionForBlock(blockHei
 		messages.LOG_LEVEL_ERROR,
 		messages.GetComponent(specVersionRangeList.getSpecVersionForBlock),
 		nil,
-		messages.SPEC_VERSION_WRONG_BLOCK,
+		SPEC_VERSION_WRONG_BLOCK,
 		blockHeight,
 	).ConsoleLog()
 	return nil

@@ -5,6 +5,13 @@ const (
 	extrinsicFunctionField   = "call_module_function"
 	extrinsicHashField       = "extrinsic_hash"
 	extrinsicSignatureField  = "signature"
+
+	// messages
+	EXTRINSIC_DECODE_FAILED                 = "Failed to decode extrinsic for block %d"
+	EXTRINSIC_FIELD_FAILED                  = "Failed to get extrinsic %s for block %d"
+	EXTRINSIC_CLIENT_STARTING               = "Starting extrinsic client with %d workers"
+	EXTRINSICS_NO_PREVIOUS_WORK             = "No previous extrinsic indexing was made"
+	EXTRINSIC_FAILED_TO_RETRIEVE_LAST_BLOCK = "Failed to retrieve last block from previous indexing"
 )
 
 type (
@@ -18,7 +25,6 @@ type (
 		IsSigned    bool
 	}
 
-	//TODO: change the structure if necessary
 	ExtrinsicJob struct {
 		BlockHeight    int
 		BlockLookupKey []byte

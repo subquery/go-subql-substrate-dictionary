@@ -140,7 +140,7 @@ func (repoClient *extrinsicRepoClient) recoverLastBlock() int {
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(repoClient.recoverLastBlock),
 			err,
-			messages.EXTRINSIC_FAILED_TO_RETRIEVE_LAST_BLOCK,
+			EXTRINSIC_FAILED_TO_RETRIEVE_LAST_BLOCK,
 		).ConsoleLog()
 	}
 

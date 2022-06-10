@@ -39,7 +39,7 @@ func (client *specvRepoClient) getLastSolvedBlockAndSpecVersion() *SpecVersionRa
 				messages.LOG_LEVEL_INFO,
 				"",
 				nil,
-				messages.SPEC_VERSION_NO_PREVIOUS_WORK,
+				SPEC_VERSION_NO_PREVIOUS_WORK,
 			).ConsoleLog()
 			return &SpecVersionRange{
 				SpecVersion: "-1",
@@ -51,7 +51,7 @@ func (client *specvRepoClient) getLastSolvedBlockAndSpecVersion() *SpecVersionRa
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(client.getLastSolvedBlockAndSpecVersion),
 			err,
-			messages.SPEC_VERSION_FAILED_DB_LAST_BLOCK,
+			SPEC_VERSION_FAILED_DB_LAST_BLOCK,
 		).ConsoleLog()
 	}
 	return &specV
@@ -81,7 +81,7 @@ func (client *specvRepoClient) getAllSpecVersionData() SpecVersionRangeList {
 				messages.LOG_LEVEL_ERROR,
 				messages.GetComponent(client.getLastSolvedBlockAndSpecVersion),
 				err,
-				messages.SPEC_VERSION_NO_PREVIOUS_WORK,
+				SPEC_VERSION_NO_PREVIOUS_WORK,
 			).ConsoleLog()
 		}
 
@@ -89,7 +89,7 @@ func (client *specvRepoClient) getAllSpecVersionData() SpecVersionRangeList {
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(client.getLastSolvedBlockAndSpecVersion),
 			err,
-			messages.SPEC_VERSION_FAILED_DB,
+			SPEC_VERSION_FAILED_DB,
 		).ConsoleLog()
 	}
 
@@ -116,7 +116,7 @@ func (client *specvRepoClient) insertSpecVersionsList(
 		messages.LOG_LEVEL_INFO,
 		"",
 		nil,
-		messages.SPEC_VERSION_DB_INSERT,
+		SPEC_VERSION_DB_INSERT,
 		newSpecVersions[0].First,
 	).ConsoleLog()
 
@@ -176,6 +176,6 @@ func (client *specvRepoClient) insertSpecVersionsList(
 		messages.LOG_LEVEL_SUCCESS,
 		"",
 		nil,
-		messages.SPEC_VERSION_DB_SUCCESS,
+		SPEC_VERSION_DB_SUCCESS,
 	).ConsoleLog()
 }

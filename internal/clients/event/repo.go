@@ -142,7 +142,7 @@ func (repoClient *eventRepoClient) insertBatch(
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(repoClient.insertBatch),
 			nil,
-			messages.EVENT_WRONG_UPDATE_NUMBER,
+			EVENT_WRONG_UPDATE_NUMBER,
 			commandTag.RowsAffected(),
 			1,
 		).ConsoleLog()
@@ -183,7 +183,7 @@ func (repoClient *eventRepoClient) recoverLastBlock() int {
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(repoClient.recoverLastBlock),
 			err,
-			messages.EVENT_FAILED_TO_RETRIEVE_LAST_BLOCK,
+			EVENT_FAILED_TO_RETRIEVE_LAST_BLOCK,
 		).ConsoleLog()
 	}
 
@@ -203,7 +203,7 @@ func getExtrinsicSuccess(eventCall string) bool {
 		messages.LOG_LEVEL_ERROR,
 		messages.GetComponent(getExtrinsicSuccess),
 		nil,
-		messages.EVENT_UNKNOWN_EXTRINSIC_SUCCESS_STATUS,
+		EVENT_UNKNOWN_EXTRINSIC_SUCCESS_STATUS,
 		eventCall,
 	).ConsoleLog()
 	return false

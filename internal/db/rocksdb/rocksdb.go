@@ -180,7 +180,7 @@ func (rc *RockClient) GetStateTrieNode(stateLookupKey []byte) []byte {
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(rc.GetStateTrieNode),
 			err,
-			messages.EVENT_FAILED_TRIE_NODE_DB,
+			messages.ROCKSDB_FAILED_TRIE_NODE_DB,
 		).ConsoleLog()
 	}
 	defer trieNode.Free()

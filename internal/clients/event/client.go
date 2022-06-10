@@ -68,7 +68,7 @@ func (client *EventClient) Run() {
 		messages.LOG_LEVEL_INFO,
 		"",
 		nil,
-		messages.EVENT_CLIENT_STARTING,
+		EVENT_CLIENT_STARTING,
 		client.workersCount,
 	).ConsoleLog()
 
@@ -104,7 +104,7 @@ func (client *EventClient) RecoverLastInsertedBlock() int {
 			messages.LOG_LEVEL_INFO,
 			"",
 			nil,
-			messages.EVENT_NO_PREVIOUS_WORK,
+			EVENT_NO_PREVIOUS_WORK,
 		).ConsoleLog()
 		return 1 //return first chain block
 	}
@@ -234,7 +234,7 @@ func getStateRootFromRawHeader(rawHeader interface{}) string {
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(getStateRootFromRawHeader),
 			nil,
-			messages.EVENT_STATE_ROOT_NOT_FOUND,
+			EVENT_STATE_ROOT_NOT_FOUND,
 		).ConsoleLog()
 	}
 
@@ -248,7 +248,7 @@ func getEventId(blockHeight int, decodedEvent map[string]interface{}) string {
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(getEventId),
 			nil,
-			messages.EVENT_FIELD_FAILED,
+			EVENT_FIELD_FAILED,
 			eventIdField,
 			blockHeight,
 		).ConsoleLog()
@@ -264,7 +264,7 @@ func getEventModule(blockHeight int, decodedEvent map[string]interface{}) string
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(getEventModule),
 			nil,
-			messages.EVENT_FIELD_FAILED,
+			EVENT_FIELD_FAILED,
 			eventModuleField,
 			blockHeight,
 		).ConsoleLog()
@@ -279,7 +279,7 @@ func getEventCall(blockHeight int, decodedEvent map[string]interface{}) string {
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(getEventCall),
 			nil,
-			messages.EVENT_FIELD_FAILED,
+			EVENT_FIELD_FAILED,
 			eventEventField,
 			blockHeight,
 		).ConsoleLog()

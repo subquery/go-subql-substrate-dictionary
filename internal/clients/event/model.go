@@ -14,6 +14,15 @@ const (
 
 	extrinsicSuccess = "ExtrinsicSuccess"
 	extrinsicFailed  = "ExtrinsicFailed"
+
+	// messages
+	EVENT_CLIENT_STARTING                  = "Starting events client with %d workers"
+	EVENT_STATE_ROOT_NOT_FOUND             = "State root hash was not found in the block header"
+	EVENT_FIELD_FAILED                     = "Failed to get event field %s for an event at block height %d"
+	EVENT_UNKNOWN_EXTRINSIC_SUCCESS_STATUS = "%s is not a valid extrinsic success status"
+	EVENT_FAILED_TO_RETRIEVE_LAST_BLOCK    = "Failed to retrieve last event block from previous indexing"
+	EVENT_NO_PREVIOUS_WORK                 = "No previous event indexing was made"
+	EVENT_WRONG_UPDATE_NUMBER              = "%d extrinsic updates were sent, but only %d took effect"
 )
 
 var (
