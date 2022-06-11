@@ -39,7 +39,7 @@ var (
 	ROCKSDB_FAILED_TRIE_NODE_DB             = "Failed to get trie node from rocksdb"
 
 	// postgres messages
-	POSTGRES_CONNECTING                        = "Connecting to postgres database using '%s'"
+	POSTGRES_CONNECTING                        = "Connecting to postgres database at '%s'"
 	POSTGRES_CONNECTED                         = "Successfully connected to postgres instance"
 	POSTGRES_FAILED_TO_PARSE_CONNECTION_STRING = "Failed to parse postgres connection string"
 	POSTGRES_FAILED_TO_CONNECT                 = "Failed to connect to postgres database"

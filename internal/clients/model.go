@@ -1,11 +1,13 @@
 package clients
 
 const (
-	ORCHESTRATOR_START                                   = "Starting client orchestrator"
-	ORCHESTRATOR_CLOSE                                   = "Closing client orchestrator"
-	ORCHESTRATOR_START_EXTRINSIC_BATCH                   = "Starting extrinsic batch of size %d starting from block %d"
-	ORCHESTRATOR_FINISH_EXTRINSIC_BATCH                  = "Extrinsic batch finished"
-	ORCHESTRATOR_FAILED_TO_REGISTER_CUSTOM_DECODER_TYPES = "Failed to register types for network"
+	ORCHESTRATOR_INITIALIZING              = "The dictionary orchestrator is initializing all the necessary services"
+	ORCHESTRATOR_START                     = "Starting client orchestrator"
+	ORCHESTRATOR_CLOSE                     = "Closing client orchestrator"
+	ORCHESTRATOR_START_PROCESSING          = "Starting %s indexing starting from block %d"
+	ORCHESTRATOR_FINISH_BATCH              = "%s batch finished up to block %d"
+	ORCHESTRATOR_FAILED_TO_READ_TYPES_FILE = "Failed to read network custom types file"
+	ORCHESTRATOR_BATCH_SIZE                = "%s client batch size is %d blocks"
 )
 
 type (

@@ -35,7 +35,11 @@ func Connect(dbConfiguration config.PostgresConfig) *PostgresClient {
 		"",
 		nil,
 		messages.POSTGRES_CONNECTING,
-		connString,
+		fmt.Sprintf("%s:%s/%s",
+			dbConfiguration.Host,
+			dbConfiguration.Port,
+			dbConfiguration.Db,
+		),
 	).ConsoleLog()
 
 	poolConfig, err := pgxpool.ParseConfig(connString)
