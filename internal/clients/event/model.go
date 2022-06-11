@@ -4,6 +4,8 @@ const (
 	triePathNibbleCount = 64
 	headerTypeString    = "Header"
 
+	topicsLen = 4
+
 	// negative block heights are used as commands
 	updateExtrinsicCommand = -1
 

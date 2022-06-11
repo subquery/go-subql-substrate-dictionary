@@ -400,14 +400,9 @@ func getEvmLogTopics(blockHeight int, params map[string]interface{}) []string {
 		).ConsoleLog()
 	}
 
-	stringTopics := make([]string, len(topics))
-	for i := range topics {
-		stringTopics[i] = topics[i].(string)
-	}
-	if len(stringTopics) != 4 {
-		for i := len(stringTopics) + 1; i <= 4; i++ {
-			stringTopics = append(stringTopics, "")
-		}
+	stringTopics := make([]string, topicsLen)
+	for i, topic := range topics {
+		stringTopics[i] = topic.(string)
 	}
 	return stringTopics
 }
