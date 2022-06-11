@@ -8,13 +8,22 @@ const (
 	updateExtrinsicCommand = -1
 
 	// decoded event fields
-	eventIdField     = "event_idx"
-	eventModuleField = "module_id"
-	eventEventField  = "event_id"
+	eventIdField       = "event_idx"
+	eventModuleField   = "module_id"
+	eventEventField    = "event_id"
+	eventTypeFiled     = "type"
+	eventParams        = "params"
+	eventParamsAddress = "address"
+	eventParamsTopics  = "topics"
+	extrinsicIdField   = "extrinsic_idx"
 
 	extrinsicSuccess = "ExtrinsicSuccess"
 	extrinsicFailed  = "ExtrinsicFailed"
 
+	extrinsicSuccessType = "0000"
+	extrinsicFailedType  = "0001"
+	evmLogType           = "3300"
+	ethereumExecutedType = "3400"
 	// messages
 	EVENT_CLIENT_STARTING                  = "Starting events client with %d workers"
 	EVENT_STATE_ROOT_NOT_FOUND             = "State root hash was not found in the block header"
@@ -50,11 +59,6 @@ var (
 		0xe: 0xe0,
 		0xf: 0xf0,
 	}
-
-	notInsertableEvents map[string]struct{} = map[string]struct{}{
-		"ExtrinsicSuccess": {},
-		"ExtrinsicFailed":  {},
-	}
 )
 
 type (
@@ -70,8 +74,22 @@ type (
 		Success bool
 	}
 
+	UpdateEvmTransactions struct {
+		Id     string
+		TxHash string
+		From   string
+		To     string
+	}
+
 	eventJob struct {
 		BlockHeight    int
 		BlockLookupKey []byte
+	}
+
+	EvmLog struct {
+		Id          string //blockHeight-logId
+		Address     string
+		BlockHeight int
+		Topics      []string
 	}
 )
