@@ -1,10 +1,14 @@
 package extrinsic
 
 const (
-	extrinsicCallModuleField = "call_module"
-	extrinsicFunctionField   = "call_module_function"
-	extrinsicHashField       = "extrinsic_hash"
-	extrinsicSignatureField  = "signature"
+	extrinsicCallModuleField  = "call_module"
+	extrinsicFunctionField    = "call_module_function"
+	extrinsicCallCodeField    = "call_code"
+	extrinsicHashField        = "extrinsic_hash"
+	extrinsicSignatureField   = "signature"
+	extrinsicParamsField      = "params"
+	extrinsicParamsInputField = "input"
+	ethereumTransactType      = "3400"
 
 	// messages
 	EXTRINSIC_DECODE_FAILED                 = "Failed to decode extrinsic for block %d"

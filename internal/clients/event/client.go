@@ -8,12 +8,13 @@ import (
 	"go-dictionary/internal/db/postgres"
 	"go-dictionary/internal/db/rocksdb"
 	"go-dictionary/internal/messages"
+	"go-dictionary/models"
 	"strconv"
 	"strings"
 
 	trieNode "go-dictionary/internal/trie/node"
 
-	scalecodec "github.com/itering/scale.go"
+	scale "github.com/itering/scale.go"
 
 	"github.com/itering/scale.go/types"
 )
@@ -29,7 +30,7 @@ type (
 
 	eventRepoClient struct {
 		*postgres.PostgresClient
-		dbChan            chan *Event
+		dbChan            chan interface{}
 		workersCount      int
 		batchFinishedChan chan struct{}
 	}
@@ -46,7 +47,7 @@ func NewEventClient(
 	specVersionClient *specversion.SpecVersionClient,
 ) *EventClient {
 	batchChan := make(chan chan *eventJob, workersCount)
-	dbChan := make(chan *Event, workersCount)
+	dbChan := make(chan interface{}, workersCount)
 	batchFinishedChan := make(chan struct{}, 1)
 
 	return &EventClient{
@@ -125,7 +126,7 @@ func (eventBatchChan *EventBatchChannel) SendWork(blockHeight int, lookupKey []b
 
 func (client *EventClient) startWorker() {
 	headerDecoder := types.ScaleDecoder{}
-	eventDecoder := scalecodec.EventsDecoder{}
+	eventDecoder := scale.EventsDecoder{}
 	eventDecoderOption := types.ScaleDecoderOption{Metadata: nil, Spec: -1}
 
 	for jobChan := range client.batchChan {
@@ -147,21 +148,58 @@ func (client *EventClient) startWorker() {
 			eventDecoder.Process()
 
 			eventsCounter := 0
-			extrinsicUpdatesCounter := 0
 			eventsArray := eventDecoder.Value.([]interface{})
 			for _, evt := range eventsArray {
 				evtValue := evt.(map[string]interface{})
 				eventCall := getEventCall(job.BlockHeight, evtValue)
+				eventType := getEventType(job.BlockHeight, evtValue)
 
-				if _, found := notInsertableEvents[eventCall]; found {
+				switch eventType {
+				case extrinsicFailedType, extrinsicSuccessType:
 					extrinsicUpdate := Event{
-						Id:          fmt.Sprintf("%d-%d", job.BlockHeight, extrinsicUpdatesCounter),
-						Event:       getEventCall(job.BlockHeight, evtValue),
+						Id:          getEventExtrinsicId(job.BlockHeight, evtValue),
+						Event:       eventCall,
 						BlockHeight: updateExtrinsicCommand,
 					}
 					client.pgClient.insertEvent(&extrinsicUpdate)
-					extrinsicUpdatesCounter++
-				} else {
+				case evmLogType:
+					eventModel := Event{
+						Id:          fmt.Sprintf("%d-%d", job.BlockHeight, eventsCounter),
+						Module:      getEventModule(job.BlockHeight, evtValue),
+						Event:       getEventCall(job.BlockHeight, evtValue),
+						BlockHeight: job.BlockHeight,
+					}
+					client.pgClient.insertEvent(&eventModel)
+					eventsCounter++
+
+					eventParams := getEvmLogParams(job.BlockHeight, evtValue)
+					evmLog := EvmLog{
+						Id:          fmt.Sprintf("%d-%d", job.BlockHeight, eventsCounter),
+						Address:     getEvmLogAddress(job.BlockHeight, eventParams),
+						BlockHeight: job.BlockHeight,
+						Topics:      getEvmLogTopics(job.BlockHeight, eventParams),
+					}
+					client.pgClient.insertEvent(&evmLog)
+				case ethereumExecutedType:
+					eventModel := Event{
+						Id:          fmt.Sprintf("%d-%d", job.BlockHeight, eventsCounter),
+						Module:      getEventModule(job.BlockHeight, evtValue),
+						Event:       getEventCall(job.BlockHeight, evtValue),
+						BlockHeight: job.BlockHeight,
+					}
+					client.pgClient.insertEvent(&eventModel)
+					eventsCounter++
+
+					evmTransactionParams := getEvmTransactionParams(job.BlockHeight, evtValue)
+					evmTransaction := models.EvmTransaction{
+						Id:      fmt.Sprintf("%d-%d", job.BlockHeight, evtValue[extrinsicIdField]),
+						TxHash:  getEvmTransactionTxHash(job.BlockHeight, evmTransactionParams),
+						From:    getEvmTransactionFromHash(job.BlockHeight, evmTransactionParams),
+						To:      getEvmTransactionToHash(job.BlockHeight, evmTransactionParams),
+						Success: getEvmTransactionStatus(job.BlockHeight, evmTransactionParams),
+					}
+					client.pgClient.insertEvent(&evmTransaction)
+				default:
 					eventModel := Event{
 						Id:          fmt.Sprintf("%d-%d", job.BlockHeight, eventsCounter),
 						Module:      getEventModule(job.BlockHeight, evtValue),
@@ -285,4 +323,172 @@ func getEventCall(blockHeight int, decodedEvent map[string]interface{}) string {
 		).ConsoleLog()
 	}
 	return event
+}
+
+func getEventType(blockHeight int, decodedEvent map[string]interface{}) string {
+	eventType, ok := decodedEvent[eventTypeFiled].(string)
+	if !ok {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(getEventType),
+			nil,
+			EVENT_FIELD_FAILED,
+			eventTypeFiled,
+			blockHeight,
+		).ConsoleLog()
+	}
+
+	return eventType
+}
+
+func getEventExtrinsicId(blockHeight int, decodedEvent map[string]interface{}) string {
+	extrinsicId, ok := decodedEvent[extrinsicIdField].(int)
+	if !ok {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(getEventExtrinsicId),
+			nil,
+			EVENT_FIELD_FAILED,
+			extrinsicIdField,
+			blockHeight,
+		).ConsoleLog()
+	}
+
+	return fmt.Sprintf("%d-%d", blockHeight, extrinsicId)
+}
+
+func getEvmLogParams(blockHeight int, decodedEvent map[string]interface{}) map[string]interface{} {
+	params, ok := decodedEvent[eventParams].([]scale.EventParam)
+	if !ok {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(getEvmLogParams),
+			nil,
+			EVENT_FIELD_FAILED,
+			eventParams,
+			blockHeight,
+		).ConsoleLog()
+	}
+	return params[0].Value.(map[string]interface{})
+}
+
+func getEvmLogAddress(blockHeight int, params map[string]interface{}) string {
+	address, ok := params[eventParamsAddress].(string)
+	if !ok {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(getEvmLogAddress),
+			nil,
+			EVENT_FIELD_FAILED,
+			eventParamsAddress,
+			blockHeight,
+		).ConsoleLog()
+	}
+	return address
+}
+
+func getEvmLogTopics(blockHeight int, params map[string]interface{}) []string {
+	topics, ok := params[eventParamsTopics].([]interface{})
+	if !ok {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(getEvmLogTopics),
+			nil,
+			EVENT_FIELD_FAILED,
+			eventParamsTopics,
+			blockHeight,
+		).ConsoleLog()
+	}
+
+	stringTopics := make([]string, len(topics))
+	for i := range topics {
+		stringTopics[i] = topics[i].(string)
+	}
+	if len(stringTopics) != 4 {
+		for i := len(stringTopics) + 1; i <= 4; i++ {
+			stringTopics = append(stringTopics, "")
+		}
+	}
+	return stringTopics
+}
+
+func getEvmTransactionParams(blockHeight int, decodedEvent map[string]interface{}) []scale.EventParam {
+	params, ok := decodedEvent[eventParams].([]scale.EventParam)
+	// from, to/contract_address, transaction_hash, exit_reason
+	if !ok {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(getEvmTransactionParams),
+			nil,
+			EVENT_FIELD_FAILED,
+			eventParams,
+			blockHeight,
+		).ConsoleLog()
+	}
+	return params
+}
+
+func getEvmTransactionFromHash(blockHeight int, params []scale.EventParam) string {
+	fromHash, ok := params[0].Value.(string)
+	if !ok {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(getEvmTransactionFromHash),
+			nil,
+			EVENT_FIELD_FAILED,
+			"fromHash",
+			blockHeight,
+		).ConsoleLog()
+	}
+	return fromHash
+}
+
+func getEvmTransactionToHash(blockHeight int, params []scale.EventParam) string {
+	toHash, ok := params[1].Value.(string)
+	if !ok {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(getEvmTransactionToHash),
+			nil,
+			EVENT_FIELD_FAILED,
+			"toHash",
+			blockHeight,
+		).ConsoleLog()
+	}
+	return toHash
+}
+
+func getEvmTransactionTxHash(blockHeight int, params []scale.EventParam) string {
+	txHash, ok := params[2].Value.(string)
+	if !ok {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(getEvmTransactionTxHash),
+			nil,
+			EVENT_FIELD_FAILED,
+			"txHash",
+			blockHeight,
+		).ConsoleLog()
+	}
+	return txHash
+}
+
+func getEvmTransactionStatus(blockHeight int, params []scale.EventParam) bool {
+	evmTransactionStatus, ok := params[3].Value.(map[string]interface{})
+	if !ok {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(getEvmTransactionStatus),
+			nil,
+			EVENT_FIELD_FAILED,
+			"evmTransactionStatus",
+			blockHeight,
+		).ConsoleLog()
+	}
+	for evmTransactionKey := range evmTransactionStatus {
+		if evmTransactionKey == "Succeed" {
+			return true
+		}
+	}
+	return false
 }

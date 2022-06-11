@@ -6,6 +6,7 @@ import (
 	"go-dictionary/internal/db/postgres"
 	"go-dictionary/internal/db/rocksdb"
 	"go-dictionary/internal/messages"
+	"go-dictionary/models"
 	"strconv"
 	"strings"
 
@@ -25,7 +26,7 @@ type (
 
 	extrinsicRepoClient struct {
 		*postgres.PostgresClient
-		dbChan            chan *Extrinsic
+		dbChan            chan interface{}
 		workersCount      int
 		batchFinishedChan chan struct{}
 	}
@@ -47,7 +48,7 @@ func NewExtrinsicClient(
 ) *ExtrinsicClient {
 
 	batchChan := make(chan chan *ExtrinsicJob, workersCount)
-	dbChan := make(chan *Extrinsic, workersCount)
+	dbChan := make(chan interface{}, workersCount)
 	batchFinishedChan := make(chan struct{}, 1)
 
 	return &ExtrinsicClient{
@@ -177,6 +178,20 @@ func (client *ExtrinsicClient) startWorker() {
 				extrinsicDecoder.Process()
 
 				decodedExtrinsic := extrinsicDecoder.Value.(map[string]interface{})
+				extrinsicCallCode := decodedExtrinsic[extrinsicCallCodeField]
+
+				if extrinsicCallCode == ethereumTransactType {
+					evmTransaction := models.EvmTransaction{
+						Id:          fmt.Sprintf("%d-%d", job.BlockHeight, idx),
+						TxHash:      "",
+						From:        "",
+						To:          "",
+						Func:        getFunc(job.BlockHeight, decodedExtrinsic),
+						BlockHeight: job.BlockHeight,
+						Success:     true,
+					}
+					client.pgClient.insertExtrinsic(&evmTransaction)
+				}
 				extrinsicModel := Extrinsic{
 					Id:          fmt.Sprintf("%d-%d", job.BlockHeight, idx),
 					Module:      getCallModule(job.BlockHeight, decodedExtrinsic),
@@ -237,4 +252,38 @@ func getHash(blockHeight int, decodedExtrinsic map[string]interface{}) string {
 func isSigned(decodedExtrinsic map[string]interface{}) bool {
 	_, ok := decodedExtrinsic["signature"]
 	return ok
+}
+
+func getFunc(blockHeight int, decodedExtrinsic map[string]interface{}) string {
+	extrinsicParams, ok := decodedExtrinsic[extrinsicParamsField].([]scale.ExtrinsicParam)
+	if !ok {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(getFunc),
+			nil,
+			EXTRINSIC_FIELD_FAILED,
+			extrinsicParamsField,
+			blockHeight,
+		).ConsoleLog()
+	}
+	extrinsicParamValue, ok := extrinsicParams[0].Value.(map[string]interface{})
+	if !ok {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(getFunc),
+			nil,
+			EXTRINSIC_FIELD_FAILED,
+			"extrinsicParamValue",
+			blockHeight,
+		).ConsoleLog()
+	}
+	input, ok := extrinsicParamValue[extrinsicParamsInputField].(string)
+	if !ok {
+		return ""
+	}
+	if len(input) >= 8 {
+		return input[:8]
+	}
+
+	return ""
 }
