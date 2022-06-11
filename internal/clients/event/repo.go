@@ -25,7 +25,7 @@ const (
 	colTopics3               = "topics3"
 
 	updateExtrinsicQuery      = "UPDATE extrinsics SET success=$1 WHERE id=$2"
-	updateEvmTransactionQuery = `UPDATE evm_transactions SET tx_hash=$1, "from"=$2, "to"=$3 WHERE id=$4`
+	updateEvmTransactionQuery = `UPDATE evm_transactions SET tx_hash=$1, "from"=$2, "to"=$3, success=$4 WHERE id=$5`
 )
 
 // insertEvent inserts an event in the database insertion buffer channel
@@ -109,10 +109,11 @@ func (repoClient *eventRepoClient) startDbWorker() {
 			insertEvmLogsCounter++
 		case *models.EvmTransaction:
 			toBeUpdatedEvmTransaction := UpdateEvmTransactions{
-				Id:     event.Id,
-				TxHash: event.TxHash,
-				To:     event.To,
-				From:   event.From,
+				Id:      event.Id,
+				TxHash:  event.TxHash,
+				To:      event.To,
+				From:    event.From,
+				Success: event.Success,
 			}
 
 			if updateEvmTransactionCounter < len(updateEvmTransactions) {
@@ -207,68 +208,72 @@ func (repoClient *eventRepoClient) insertBatch(
 	}
 
 	// Extrinsics Status
-	extrinsicUpdateBatch := &pgx.Batch{}
-	for _, extrinsicUpdate := range updateExtrinsics {
-		extrinsicUpdateBatch.Queue(
-			updateExtrinsicQuery,
-			extrinsicUpdate.Success,
-			extrinsicUpdate.Id,
-		)
+	if len(updateExtrinsics) > 0 {
+		extrinsicUpdateBatch := &pgx.Batch{}
+		for _, extrinsicUpdate := range updateExtrinsics {
+			extrinsicUpdateBatch.Queue(
+				updateExtrinsicQuery,
+				extrinsicUpdate.Success,
+				extrinsicUpdate.Id,
+			)
+		}
+		batchResults := tx.SendBatch(context.Background(), extrinsicUpdateBatch)
+		commandTag, err := batchResults.Exec()
+		if err != nil {
+			messages.NewDictionaryMessage(
+				messages.LOG_LEVEL_ERROR,
+				messages.GetComponent(repoClient.insertBatch),
+				err,
+				messages.POSTGRES_FAILED_TO_EXECUTE_UPDATE,
+			).ConsoleLog()
+		}
+		if commandTag.RowsAffected() != 1 {
+			messages.NewDictionaryMessage(
+				messages.LOG_LEVEL_ERROR,
+				messages.GetComponent(repoClient.insertBatch),
+				nil,
+				EVENT_WRONG_UPDATE_NUMBER,
+				commandTag.RowsAffected(),
+				1,
+			).ConsoleLog()
+		}
+		batchResults.Close()
 	}
-	batchResults := tx.SendBatch(context.Background(), extrinsicUpdateBatch)
-	commandTag, err := batchResults.Exec()
-	if err != nil {
-		messages.NewDictionaryMessage(
-			messages.LOG_LEVEL_ERROR,
-			messages.GetComponent(repoClient.insertBatch),
-			err,
-			messages.POSTGRES_FAILED_TO_EXECUTE_UPDATE,
-		).ConsoleLog()
-	}
-	if commandTag.RowsAffected() != 1 {
-		messages.NewDictionaryMessage(
-			messages.LOG_LEVEL_ERROR,
-			messages.GetComponent(repoClient.insertBatch),
-			nil,
-			EVENT_WRONG_UPDATE_NUMBER,
-			commandTag.RowsAffected(),
-			1,
-		).ConsoleLog()
-	}
-	batchResults.Close()
-
 	// Update EvmTransactions
-	evmTransactionsUpdateBatch := &pgx.Batch{}
-	for _, evmTransactionUpdate := range updateEvmTransactions {
-		extrinsicUpdateBatch.Queue(
-			updateEvmTransactionQuery,
-			evmTransactionUpdate.TxHash,
-			evmTransactionUpdate.From,
-			evmTransactionUpdate.To,
-			evmTransactionUpdate.Id,
-		)
+	if len(updateEvmTransactions) > 0 {
+		evmTransactionsUpdateBatch := &pgx.Batch{}
+		for _, evmTransactionUpdate := range updateEvmTransactions {
+			evmTransactionsUpdateBatch.Queue(
+				updateEvmTransactionQuery,
+				evmTransactionUpdate.TxHash,
+				evmTransactionUpdate.From,
+				evmTransactionUpdate.To,
+				evmTransactionUpdate.Success,
+				evmTransactionUpdate.Id,
+			)
+		}
+		batchResults := tx.SendBatch(context.Background(), evmTransactionsUpdateBatch)
+		commandTag, err := batchResults.Exec()
+		if err != nil {
+			messages.NewDictionaryMessage(
+				messages.LOG_LEVEL_ERROR,
+				messages.GetComponent(repoClient.insertBatch),
+				err,
+				messages.POSTGRES_FAILED_TO_EXECUTE_UPDATE,
+			).ConsoleLog()
+		}
+		if commandTag.RowsAffected() != 1 {
+			messages.NewDictionaryMessage(
+				messages.LOG_LEVEL_ERROR,
+				messages.GetComponent(repoClient.insertBatch),
+				nil,
+				EVENT_WRONG_UPDATE_NUMBER,
+				commandTag.RowsAffected(),
+				1,
+			).ConsoleLog()
+		}
+		batchResults.Close()
 	}
-	batchResults = tx.SendBatch(context.Background(), evmTransactionsUpdateBatch)
-	commandTag, err = batchResults.Exec()
-	if err != nil {
-		messages.NewDictionaryMessage(
-			messages.LOG_LEVEL_ERROR,
-			messages.GetComponent(repoClient.insertBatch),
-			err,
-			messages.POSTGRES_FAILED_TO_EXECUTE_UPDATE,
-		).ConsoleLog()
-	}
-	if commandTag.RowsAffected() != 1 {
-		messages.NewDictionaryMessage(
-			messages.LOG_LEVEL_ERROR,
-			messages.GetComponent(repoClient.insertBatch),
-			nil,
-			EVENT_WRONG_UPDATE_NUMBER,
-			commandTag.RowsAffected(),
-			1,
-		).ConsoleLog()
-	}
-	batchResults.Close()
 
 	err = tx.Commit(context.Background())
 	if err != nil {

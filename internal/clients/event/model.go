@@ -75,10 +75,11 @@ type (
 	}
 
 	UpdateEvmTransactions struct {
-		Id     string
-		TxHash string
-		From   string
-		To     string
+		Id      string
+		TxHash  string
+		From    string
+		To      string
+		Success bool
 	}
 
 	eventJob struct {

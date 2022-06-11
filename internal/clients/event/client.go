@@ -192,10 +192,11 @@ func (client *EventClient) startWorker() {
 
 					evmTransactionParams := getEvmTransactionParams(job.BlockHeight, evtValue)
 					evmTransaction := models.EvmTransaction{
-						Id:     fmt.Sprintf("%d-%d", job.BlockHeight, evtValue[extrinsicIdField]),
-						TxHash: getEvmTransactionTxHash(job.BlockHeight, evmTransactionParams),
-						From:   getEvmTransactionFromHash(job.BlockHeight, evmTransactionParams),
-						To:     getEvmTransactionToHash(job.BlockHeight, evmTransactionParams),
+						Id:      fmt.Sprintf("%d-%d", job.BlockHeight, evtValue[extrinsicIdField]),
+						TxHash:  getEvmTransactionTxHash(job.BlockHeight, evmTransactionParams),
+						From:    getEvmTransactionFromHash(job.BlockHeight, evmTransactionParams),
+						To:      getEvmTransactionToHash(job.BlockHeight, evmTransactionParams),
+						Success: getEvmTransactionStatus(job.BlockHeight, evmTransactionParams),
 					}
 					client.pgClient.insertEvent(&evmTransaction)
 				default:
@@ -470,4 +471,24 @@ func getEvmTransactionTxHash(blockHeight int, params []scale.EventParam) string 
 		).ConsoleLog()
 	}
 	return txHash
+}
+
+func getEvmTransactionStatus(blockHeight int, params []scale.EventParam) bool {
+	evmTransactionStatus, ok := params[3].Value.(map[string]interface{})
+	if !ok {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(getEvmTransactionStatus),
+			nil,
+			EVENT_FIELD_FAILED,
+			"evmTransactionStatus",
+			blockHeight,
+		).ConsoleLog()
+	}
+	for evmTransactionKey := range evmTransactionStatus {
+		if evmTransactionKey == "Succeed" {
+			return true
+		}
+	}
+	return false
 }
