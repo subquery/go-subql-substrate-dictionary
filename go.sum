@@ -189,6 +189,9 @@ github.com/ipfs/go-log/v2 v2.0.2/go.mod h1:O7P1lJt27vWHhOwQmcFEvlmo49ry2VY2+JfBW
 github.com/ipfs/go-log/v2 v2.0.3/go.mod h1:O7P1lJt27vWHhOwQmcFEvlmo49ry2VY2+JfBWFaa9+0=
 github.com/ipfs/go-log/v2 v2.0.5/go.mod h1:eZs4Xt4ZUJQFM3DlanGhy7TkwwawCZcSByscwkWG+dw=
 github.com/ipfs/go-log/v2 v2.1.1/go.mod h1:2v2nsGfZsvvAJz13SyFzf9ObaqwHiHxsPLEHntrv9KM=
+github.com/itering/scale.go v1.1.42/go.mod h1:Eg8T/07SKybkN9E1LmiEdSN/pLtV4rZDN9zuj486Gbs=
+github.com/itering/scale.go v1.2.1 h1:WCqThAXixzO5LzBPPXfl/ab8rJ1rZm8yEX4nCx8ueoA=
+github.com/itering/scale.go v1.2.1/go.mod h1:Eg8T/07SKybkN9E1LmiEdSN/pLtV4rZDN9zuj486Gbs=
 github.com/itering/substrate-api-rpc v0.4.11 h1:b28xIlmJrdvxDWIrRTArHHllOPSR/fkm6GMCcdEKSJ0=
 github.com/itering/substrate-api-rpc v0.4.11/go.mod h1:t9EFksWioBNNlcrC3eQse24rB20sHNeKLXc1dJZfRSg=
 github.com/jackc/chunkreader v1.0.0/go.mod h1:RT6O25fNZIuasFJRyZ4R/Y2BbhasbmZXF9QQ7T3kePo=

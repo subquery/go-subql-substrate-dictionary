@@ -48,7 +48,12 @@ func (repoClient *eventRepoClient) startDbWorker() {
 		if eventRaw == nil {
 			workerCounter++
 			if workerCounter == repoClient.workersCount {
-				repoClient.insertBatch(insertEvents[:insertEventsCounter], updateExtrinsics[:updateExtrinsicCounter], updateEvmTransactions[:updateEvmTransactionCounter], insertEvmLogs[:insertEvmLogsCounter])
+				repoClient.insertBatch(
+					insertEvents[:insertEventsCounter],
+					updateExtrinsics[:updateExtrinsicCounter],
+					updateEvmTransactions[:updateEvmTransactionCounter],
+					insertEvmLogs[:insertEvmLogsCounter],
+				)
 				workerCounter = 0
 				insertEventsCounter = 0
 				insertEvmLogsCounter = 0
@@ -66,7 +71,7 @@ func (repoClient *eventRepoClient) startDbWorker() {
 			if event.BlockHeight == updateExtrinsicCommand {
 				toBeUpdatedExtrinsic := UpdateExtrinsic{
 					Id:      event.Id,
-					Success: getExtrinsicSuccess(event.Event),
+					Success: false,
 				}
 
 				if updateExtrinsicCounter < len(updateExtrinsics) {
@@ -314,23 +319,4 @@ func (repoClient *eventRepoClient) recoverLastBlock() int {
 	}
 
 	return blockHeight
-}
-
-func getExtrinsicSuccess(eventCall string) bool {
-	if eventCall == extrinsicSuccess {
-		return true
-	}
-
-	if eventCall == extrinsicFailed {
-		return false
-	}
-
-	messages.NewDictionaryMessage(
-		messages.LOG_LEVEL_ERROR,
-		messages.GetComponent(getExtrinsicSuccess),
-		nil,
-		EVENT_UNKNOWN_EXTRINSIC_SUCCESS_STATUS,
-		eventCall,
-	).ConsoleLog()
-	return false
 }

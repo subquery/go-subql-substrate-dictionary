@@ -3,8 +3,7 @@ package event
 const (
 	triePathNibbleCount = 64
 	headerTypeString    = "Header"
-
-	topicsLen = 4
+	topicsLen           = 4
 
 	// negative block heights are used as commands
 	updateExtrinsicCommand = -1
@@ -13,19 +12,17 @@ const (
 	eventIdField       = "event_idx"
 	eventModuleField   = "module_id"
 	eventEventField    = "event_id"
-	eventTypeFiled     = "type"
+	eventTypeField     = "type"
 	eventParams        = "params"
 	eventParamsAddress = "address"
 	eventParamsTopics  = "topics"
 	extrinsicIdField   = "extrinsic_idx"
 
-	extrinsicSuccess = "ExtrinsicSuccess"
-	extrinsicFailed  = "ExtrinsicFailed"
-
 	extrinsicSuccessType = "0000"
 	extrinsicFailedType  = "0001"
 	evmLogType           = "3300"
 	ethereumExecutedType = "3400"
+
 	// messages
 	EVENT_CLIENT_STARTING                  = "Starting events client with %d workers"
 	EVENT_STATE_ROOT_NOT_FOUND             = "State root hash was not found in the block header"

@@ -134,9 +134,10 @@ func (orchestrator *Orchestrator) Run() {
 func (orchestrator *Orchestrator) runExtrinsics() {
 	workerName := "EXTRINSIC"
 
-	var extrinsicBatchChannel *extrinsic.ExtrinsicBatchChannel
-	extrinsicBatchChannel = orchestrator.extrinsicClient.StartBatch()
+	extrinsicBatchChannel := orchestrator.extrinsicClient.StartBatch()
 	startingBlock := orchestrator.extrinsicClient.RecoverLastInsertedBlock()
+	lastBlock := orchestrator.rdbClient.GetLastBlockSynced()
+
 	messages.NewDictionaryMessage(
 		messages.LOG_LEVEL_INFO,
 		"",
@@ -149,7 +150,6 @@ func (orchestrator *Orchestrator) runExtrinsics() {
 	atomic.StoreUint64(&orchestrator.extrinsicHeight, uint64(startingBlock))
 
 	for {
-		lastBlock := orchestrator.getLastSyncedBlock()
 		for blockHeight := startingBlock + 1; blockHeight <= lastBlock; blockHeight++ {
 			lookupKey := orchestrator.rdbClient.GetLookupKeyForBlockHeight(blockHeight)
 			extrinsicBatchChannel.SendWork(blockHeight, lookupKey)
@@ -188,6 +188,7 @@ func (orchestrator *Orchestrator) runExtrinsics() {
 		}
 
 		startingBlock = lastBlock
+		lastBlock = orchestrator.getLastSyncedBlock()
 	}
 }
 
@@ -270,7 +271,7 @@ func (orchestrator *Orchestrator) getLastSyncedBlock() int {
 		if lastBlock != orchestrator.lastProcessedBlock && lastBlock >= firstChainBlock {
 			orchestrator.specversionClient.UpdateLive(lastBlock)
 			orchestrator.lastProcessedBlock = lastBlock
-			return lastBlock
 		}
+		return lastBlock
 	}
 }

@@ -155,7 +155,12 @@ func (client *EventClient) startWorker() {
 				eventType := getEventType(job.BlockHeight, evtValue)
 
 				switch eventType {
-				case extrinsicFailedType, extrinsicSuccessType:
+				// ignore extrinsic success as all extrinsics status was initiated with "true"
+				case extrinsicSuccessType:
+					{
+
+					}
+				case extrinsicFailedType:
 					extrinsicUpdate := Event{
 						Id:          getEventExtrinsicId(job.BlockHeight, evtValue),
 						Event:       eventCall,
@@ -326,14 +331,14 @@ func getEventCall(blockHeight int, decodedEvent map[string]interface{}) string {
 }
 
 func getEventType(blockHeight int, decodedEvent map[string]interface{}) string {
-	eventType, ok := decodedEvent[eventTypeFiled].(string)
+	eventType, ok := decodedEvent[eventTypeField].(string)
 	if !ok {
 		messages.NewDictionaryMessage(
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(getEventType),
 			nil,
 			EVENT_FIELD_FAILED,
-			eventTypeFiled,
+			eventTypeField,
 			blockHeight,
 		).ConsoleLog()
 	}

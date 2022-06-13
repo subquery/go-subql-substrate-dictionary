@@ -2,7 +2,7 @@ module go-dictionary
 
 go 1.18
 
-replace github.com/itering/scale.go => /tmp/scale.go
+// replace github.com/itering/scale.go => /tmp/scale.go
 
 require (
 	github.com/ChainSafe/gossamer v0.6.0
@@ -11,7 +11,6 @@ require (
 	github.com/jackc/pgx/v4 v4.15.0
 	github.com/linxGnu/grocksdb v1.6.48
 	github.com/qdm12/gotree v0.2.0
-	github.com/stretchr/testify v1.7.0
 	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3
 )
 
@@ -43,6 +42,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
+	github.com/stretchr/testify v1.7.0 // indirect
 	golang.org/x/sys v0.0.0-20220317061510-51cd9980dadf // indirect
 	golang.org/x/text v0.3.7 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
