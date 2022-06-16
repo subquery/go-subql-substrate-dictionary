@@ -139,7 +139,7 @@ func (client *EventClient) startWorker() {
 
 			specVersionMeta := client.specVersionClient.GetSpecVersionAndMetadata(job.BlockHeight)
 			specVersion, _ := strconv.Atoi(specVersionMeta.SpecVersion)
-			if eventDecoderOption.Spec == -1 || eventDecoderOption.Spec != specVersion {
+			if eventDecoderOption.Spec != specVersion {
 				eventDecoderOption.Metadata = specVersionMeta.Meta
 				eventDecoderOption.Spec = specVersion
 			}
@@ -175,7 +175,6 @@ func (client *EventClient) startWorker() {
 						BlockHeight: job.BlockHeight,
 					}
 					client.pgClient.insertEvent(&eventModel)
-					eventsCounter++
 
 					eventParams := getEvmLogParams(job.BlockHeight, evtValue)
 					evmLog := EvmLog{
@@ -185,6 +184,8 @@ func (client *EventClient) startWorker() {
 						Topics:      getEvmLogTopics(job.BlockHeight, eventParams),
 					}
 					client.pgClient.insertEvent(&evmLog)
+
+					eventsCounter++
 				case ethereumExecutedType:
 					eventModel := Event{
 						Id:          fmt.Sprintf("%d-%d", job.BlockHeight, eventsCounter),

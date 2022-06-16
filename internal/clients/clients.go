@@ -50,15 +50,6 @@ func NewOrchestrator(
 	rdbClient := rocksdb.OpenRocksdb(config.RocksdbConfig)
 	lastBlock := rdbClient.GetLastBlockSynced()
 
-	// SPEC VERSION -- spec version and ranges for each spec
-	specVersionClient := specversion.NewSpecVersionClient(
-		lastBlock,
-		rdbClient,
-		pgClient,
-		config.ChainConfig.HttpRpcEndpoint,
-	)
-	specVersionClient.Run()
-
 	// Register custom types
 	c, err := ioutil.ReadFile(config.ChainConfig.DecoderTypesFile)
 	if err != nil {
@@ -69,7 +60,20 @@ func NewOrchestrator(
 			ORCHESTRATOR_FAILED_TO_READ_TYPES_FILE,
 		).ConsoleLog()
 	}
+	types.RuntimeType{}.Reg()
 	types.RegCustomTypes(source.LoadTypeRegistry(c))
+
+	// SPEC VERSION -- spec version and ranges for each spec
+	specVersionClient := specversion.NewSpecVersionClient(
+		lastBlock,
+		rdbClient,
+		pgClient,
+		config.ChainConfig.HttpRpcEndpoint,
+	)
+	// quickfix
+	event.FixPolkdotEventDecoder()
+
+	specVersionClient.Run()
 
 	// EXTRINSIC - extrinsic client
 	extrinsicClient := extrinsic.NewExtrinsicClient(
@@ -271,7 +275,7 @@ func (orchestrator *Orchestrator) getLastSyncedBlock() int {
 		if lastBlock != orchestrator.lastProcessedBlock && lastBlock >= firstChainBlock {
 			orchestrator.specversionClient.UpdateLive(lastBlock)
 			orchestrator.lastProcessedBlock = lastBlock
+			return lastBlock
 		}
-		return lastBlock
 	}
 }

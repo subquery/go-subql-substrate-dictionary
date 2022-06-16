@@ -12,7 +12,8 @@ import (
 
 	scale "github.com/itering/scale.go"
 	"github.com/itering/scale.go/types"
-	"github.com/itering/substrate-api-rpc/util"
+	"github.com/itering/scale.go/utiles"
+	"golang.org/x/crypto/blake2b"
 )
 
 type (
@@ -157,7 +158,7 @@ func (client *ExtrinsicClient) startWorker() {
 
 			specVersionMeta := client.specVersionClient.GetSpecVersionAndMetadata(job.BlockHeight)
 			specVersion, _ := strconv.Atoi(specVersionMeta.SpecVersion)
-			if extrinsicDecoderOption.Spec == -1 || extrinsicDecoderOption.Spec != specVersion {
+			if extrinsicDecoderOption.Spec != specVersion {
 				extrinsicDecoderOption.Metadata = specVersionMeta.Meta
 				extrinsicDecoderOption.Spec = specVersion
 			}
@@ -173,8 +174,7 @@ func (client *ExtrinsicClient) startWorker() {
 					).ConsoleLog()
 				}
 
-				//TODO: "init" with options only if the spec version is new
-				extrinsicDecoder.Init(types.ScaleBytes{Data: util.HexToBytes(rawExtrinsic)}, &extrinsicDecoderOption)
+				extrinsicDecoder.Init(types.ScaleBytes{Data: utiles.HexToBytes(rawExtrinsic)}, &extrinsicDecoderOption)
 				extrinsicDecoder.Process()
 
 				decodedExtrinsic := extrinsicDecoder.Value.(map[string]interface{})
@@ -198,7 +198,7 @@ func (client *ExtrinsicClient) startWorker() {
 					Call:        getCallFunction(job.BlockHeight, decodedExtrinsic),
 					BlockHeight: job.BlockHeight,
 					Success:     true, //the real value is get from events
-					TxHash:      getHash(job.BlockHeight, decodedExtrinsic),
+					TxHash:      getHash(job.BlockHeight, decodedExtrinsic, rawExtrinsic),
 					IsSigned:    isSigned(decodedExtrinsic),
 				}
 				client.pgClient.insertExtrinsic(&extrinsicModel)
@@ -240,11 +240,10 @@ func getCallFunction(blockHeight int, decodedExtrinsic map[string]interface{}) s
 	return callFunction
 }
 
-func getHash(blockHeight int, decodedExtrinsic map[string]interface{}) string {
+func getHash(blockHeight int, decodedExtrinsic map[string]interface{}, rawExtrinsic string) string {
 	txHash, ok := decodedExtrinsic[extrinsicHashField].(string)
 	if !ok {
-		//TODO: calculate "hash" if not found
-		return ""
+		return generateTxHash(rawExtrinsic)
 	}
 	return txHash
 }
@@ -286,4 +285,9 @@ func getFunc(blockHeight int, decodedExtrinsic map[string]interface{}) string {
 	}
 
 	return ""
+}
+
+func generateTxHash(extrinsic string) string {
+	extrinsicBytes := blake2b.Sum256(utiles.HexToBytes(extrinsic))
+	return utiles.BytesToHex(extrinsicBytes[:])
 }
