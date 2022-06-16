@@ -9,10 +9,3 @@ const (
 	ORCHESTRATOR_FAILED_TO_READ_TYPES_FILE = "Failed to read network custom types file"
 	ORCHESTRATOR_BATCH_SIZE                = "%s client batch size is %d blocks"
 )
-
-type (
-	job struct {
-		BlockHeight    int
-		BlockLookupKey []byte
-	}
-)

@@ -40,6 +40,10 @@ type (
 	}
 )
 
+const (
+	firstChainBlock = 1
+)
+
 func NewEventClient(
 	pgClient *postgres.PostgresClient,
 	rocksdbClient *rocksdb.RockClient,
@@ -107,7 +111,7 @@ func (client *EventClient) RecoverLastInsertedBlock() int {
 			nil,
 			EVENT_NO_PREVIOUS_WORK,
 		).ConsoleLog()
-		return 1 //return first chain block
+		return firstChainBlock
 	}
 	return lastBlock
 }
@@ -157,9 +161,6 @@ func (client *EventClient) startWorker() {
 				switch eventType {
 				// ignore extrinsic success as all extrinsics status was initiated with "true"
 				case extrinsicSuccessType:
-					{
-
-					}
 				case extrinsicFailedType:
 					extrinsicUpdate := Event{
 						Id:          getEventExtrinsicId(job.BlockHeight, evtValue),
@@ -171,12 +172,9 @@ func (client *EventClient) startWorker() {
 					eventModel := Event{
 						Id:          fmt.Sprintf("%d-%d", job.BlockHeight, eventsCounter),
 						Module:      getEventModule(job.BlockHeight, evtValue),
-						Event:       getEventCall(job.BlockHeight, evtValue),
+						Event:       eventCall,
 						BlockHeight: job.BlockHeight,
 					}
-					client.pgClient.insertEvent(&eventModel)
-					eventsCounter++
-
 					eventParams := getEvmLogParams(job.BlockHeight, evtValue)
 					evmLog := EvmLog{
 						Id:          fmt.Sprintf("%d-%d", job.BlockHeight, eventsCounter),
@@ -184,17 +182,17 @@ func (client *EventClient) startWorker() {
 						BlockHeight: job.BlockHeight,
 						Topics:      getEvmLogTopics(job.BlockHeight, eventParams),
 					}
+
 					client.pgClient.insertEvent(&evmLog)
+					client.pgClient.insertEvent(&eventModel)
+					eventsCounter++
 				case ethereumExecutedType:
 					eventModel := Event{
 						Id:          fmt.Sprintf("%d-%d", job.BlockHeight, eventsCounter),
 						Module:      getEventModule(job.BlockHeight, evtValue),
-						Event:       getEventCall(job.BlockHeight, evtValue),
+						Event:       eventCall,
 						BlockHeight: job.BlockHeight,
 					}
-					client.pgClient.insertEvent(&eventModel)
-					eventsCounter++
-
 					evmTransactionParams := getEvmTransactionParams(job.BlockHeight, evtValue)
 					evmTransaction := models.EvmTransaction{
 						Id:      fmt.Sprintf("%d-%d", job.BlockHeight, evtValue[extrinsicIdField]),
@@ -203,12 +201,15 @@ func (client *EventClient) startWorker() {
 						To:      getEvmTransactionToHash(job.BlockHeight, evmTransactionParams),
 						Success: getEvmTransactionStatus(job.BlockHeight, evmTransactionParams),
 					}
+
 					client.pgClient.insertEvent(&evmTransaction)
+					client.pgClient.insertEvent(&eventModel)
+					eventsCounter++
 				default:
 					eventModel := Event{
 						Id:          fmt.Sprintf("%d-%d", job.BlockHeight, eventsCounter),
 						Module:      getEventModule(job.BlockHeight, evtValue),
-						Event:       getEventCall(job.BlockHeight, evtValue),
+						Event:       eventCall,
 						BlockHeight: job.BlockHeight,
 					}
 					client.pgClient.insertEvent(&eventModel)

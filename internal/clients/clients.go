@@ -3,6 +3,7 @@ package clients
 import (
 	"go-dictionary/internal/clients/event"
 	"go-dictionary/internal/clients/extrinsic"
+	"go-dictionary/internal/clients/metadata"
 	"go-dictionary/internal/clients/specversion"
 	"go-dictionary/internal/config"
 	"go-dictionary/internal/db/postgres"
@@ -104,6 +105,13 @@ func NewOrchestrator(
 		"Event",
 		config.ClientsConfig.Events.BatchSize,
 	).ConsoleLog()
+
+	// METADATA - metadata client
+	metadataClient := metadata.NewMetadataClient(
+		pgClient,
+		rdbClient,
+	)
+	metadataClient.Run()
 
 	return &Orchestrator{
 		configuration:      config,
@@ -271,7 +279,7 @@ func (orchestrator *Orchestrator) getLastSyncedBlock() int {
 		if lastBlock != orchestrator.lastProcessedBlock && lastBlock >= firstChainBlock {
 			orchestrator.specversionClient.UpdateLive(lastBlock)
 			orchestrator.lastProcessedBlock = lastBlock
+			return lastBlock
 		}
-		return lastBlock
 	}
 }

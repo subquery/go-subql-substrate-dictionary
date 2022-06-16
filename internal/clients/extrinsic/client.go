@@ -37,7 +37,8 @@ type (
 )
 
 const (
-	bodyTypeString = "Vec<Bytes>"
+	bodyTypeString  = "Vec<Bytes>"
+	firstChainBlock = 1
 )
 
 func NewExtrinsicClient(
@@ -116,7 +117,7 @@ func (client *ExtrinsicClient) RecoverLastInsertedBlock() int {
 			nil,
 			EXTRINSICS_NO_PREVIOUS_WORK,
 		).ConsoleLog()
-		return 1
+		return firstChainBlock
 	}
 
 	return lastBlock
@@ -173,7 +174,6 @@ func (client *ExtrinsicClient) startWorker() {
 					).ConsoleLog()
 				}
 
-				//TODO: "init" with options only if the spec version is new
 				extrinsicDecoder.Init(types.ScaleBytes{Data: util.HexToBytes(rawExtrinsic)}, &extrinsicDecoderOption)
 				extrinsicDecoder.Process()
 

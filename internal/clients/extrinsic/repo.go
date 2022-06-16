@@ -87,7 +87,7 @@ func (repoClient *extrinsicRepoClient) startDbWorker() {
 			}
 			evmTransactionsCounter++
 		default:
-			fmt.Println("ASMDIAMSIDMIADSMI?")
+
 		}
 
 	}

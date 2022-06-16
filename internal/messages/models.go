@@ -46,6 +46,7 @@ var (
 	POSTGRES_FAILED_TO_PING                    = "Failed to ping postgres database instance"
 	POSTGRES_FAILED_TO_START_TRANSACTION       = "Failed to start postgres transaction"
 	POSTGRES_FAILED_TO_EXECUTE_UPDATE          = "Failed to execute update statement"
+	POSTGRES_FAILED_TO_INSERT                  = "Failed to execute insert statement"
 	POSTGRES_FAILED_TO_COPY_FROM               = "Postgres failed to copy from rows"
 	POSTGRES_WRONG_NUMBER_OF_COPIED_ROWS       = "Postgres copied %d rows out of %d"
 	POSTGRES_FAILED_TO_COMMIT_TX               = "Failed to commit postgres transaction"

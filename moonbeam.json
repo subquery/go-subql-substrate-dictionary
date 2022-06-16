@@ -24,6 +24,6 @@
         "postgres_host": "localhost",
         "postgres_port": "5432",
         "postgres_db": "subquery",
-        "postgres_conn_pool": 20
+        "postgres_conn_pool": 21
     }
 }
