@@ -110,6 +110,7 @@ func NewOrchestrator(
 	metadataClient := metadata.NewMetadataClient(
 		pgClient,
 		rdbClient,
+		config.ChainConfig.HttpRpcEndpoint,
 	)
 	metadataClient.Run()
 

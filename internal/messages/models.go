@@ -37,6 +37,7 @@ var (
 	ROCKSDB_FAILED_HEADER                   = "Failed to retrieve block header from rocksdb"
 	ROCKSDB_FAILED_TO_UPDATE_SECONDARY      = "Failed to synchronize secondary rocksdb instance with primary"
 	ROCKSDB_FAILED_TRIE_NODE_DB             = "Failed to get trie node from rocksdb"
+	ROCKSDB_FAILED_GENESIS                  = "Failed to get genesis hash from rocksdb instance"
 
 	// postgres messages
 	POSTGRES_CONNECTING                        = "Connecting to postgres database at '%s'"

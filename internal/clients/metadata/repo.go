@@ -46,7 +46,11 @@ var (
 	}
 )
 
-func (repoClient *metadataRepoClient) initTables(tablesEstimates []RowCountEstimate) {
+func (repoClient *metadataRepoClient) initTables(
+	tablesEstimates []RowCountEstimate,
+	genesisHash string,
+	chainName string,
+) {
 	query := fmt.Sprintf(
 		`INSERT INTO %s(%s,%s,"%s","%s") VALUES
 		($1,$2,$3,$4),
@@ -66,11 +70,13 @@ func (repoClient *metadataRepoClient) initTables(tablesEstimates []RowCountEstim
 		colKey,
 	)
 
-	currentTimestamp := getTimestamp()
-	timestampString := getTimeString()
+	currentTimestamp, timestampString := getTimestamp()
+
 	jsonString, _ := json.Marshal("")
 	jsonBool, _ := json.Marshal(true)
 	jsonNil, _ := json.Marshal(nil)
+	genesisHashJSON, _ := json.Marshal(genesisHash)
+	chainNameJSON, _ := json.Marshal(chainName)
 
 	tableEstimatesJson, err := json.Marshal(tablesEstimates)
 	if err != nil {
@@ -86,11 +92,11 @@ func (repoClient *metadataRepoClient) initTables(tablesEstimates []RowCountEstim
 	_, err = repoClient.Pool.Exec(
 		context.Background(), query,
 		lastProcessedHeight, 0, timestampString, timestampString,
-		lastProcessedTimestamp, int(currentTimestamp), timestampString, timestampString,
+		lastProcessedTimestamp, currentTimestamp, timestampString, timestampString,
 		targetHeight, 0, timestampString, timestampString,
-		chain, jsonString, timestampString, timestampString,
+		chain, chainNameJSON, timestampString, timestampString,
 		specName, jsonString, timestampString, timestampString,
-		genesisHash, 0, timestampString, timestampString,
+		genesisHash, genesisHashJSON, timestampString, timestampString,
 		indexerHealthy, jsonBool, timestampString, timestampString,
 		indexerNodeVersion, jsonString, timestampString, timestampString,
 		queryNodeVersion, jsonString, timestampString, timestampString,
@@ -169,7 +175,7 @@ func (repoClient *metadataRepoClient) updateLastProcessedHeight() {
 		value=$1, "updatedAt"=$2 
 		WHERE key='lastProcessedHeight' AND value!=$3`
 
-	timestampString := getTimeString()
+	timestampInt, timestampString := getTimestamp()
 	_, err = repoClient.Pool.Exec(
 		context.Background(),
 		updateQuery,
@@ -185,6 +191,7 @@ func (repoClient *metadataRepoClient) updateLastProcessedHeight() {
 			messages.POSTGRES_FAILED_TO_EXECUTE_UPDATE,
 		).ConsoleLog()
 	}
+	repoClient.updateLastProcessedTimestamp(timestampInt, timestampString)
 }
 
 // getTableRowsCount returns the number of rows inside a table
@@ -217,7 +224,7 @@ func (repoClient *metadataRepoClient) updateTargetHeight(height int) {
 		value=$1, "updatedAt"=$2 
 		WHERE key='targetHeight'`
 
-	timestampString := getTimeString()
+	timestampInt, timestampString := getTimestamp()
 	_, err := repoClient.Pool.Exec(
 		context.Background(),
 		query,
@@ -232,12 +239,15 @@ func (repoClient *metadataRepoClient) updateTargetHeight(height int) {
 			messages.POSTGRES_FAILED_TO_EXECUTE_UPDATE,
 		).ConsoleLog()
 	}
+	repoClient.updateLastProcessedTimestamp(timestampInt, timestampString)
 }
 
 func (repoClient *metadataRepoClient) setIndexerHealthy(healthy bool) {
-	query := `UPDATE _metadata SET value=$1, "updatedAt"=$2 WHERE key='indexerHealthy'`
+	query := `UPDATE _metadata SET 
+	value=$1, "updatedAt"=$2 
+	WHERE key='indexerHealthy'`
 
-	timestampString := getTimeString()
+	timestampInt, timestampString := getTimestamp()
 	_, err := repoClient.Pool.Exec(
 		context.Background(),
 		query,
@@ -248,6 +258,29 @@ func (repoClient *metadataRepoClient) setIndexerHealthy(healthy bool) {
 		messages.NewDictionaryMessage(
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(repoClient.setIndexerHealthy),
+			err,
+			messages.POSTGRES_FAILED_TO_EXECUTE_UPDATE,
+		).ConsoleLog()
+	}
+	repoClient.updateLastProcessedTimestamp(timestampInt, timestampString)
+}
+
+func (repoClient *metadataRepoClient) updateLastProcessedTimestamp(timestampInt int, timestampString string) {
+	query := `UPDATE _metadata SET 
+	value=$1, "updatedAt"=$2
+	WHERE key='lastProcessedTimestamp' AND value!=$3`
+
+	_, err := repoClient.Pool.Exec(
+		context.Background(),
+		query,
+		timestampInt,
+		timestampString,
+		timestampInt,
+	)
+	if err != nil {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(repoClient.updateLastProcessedTimestamp),
 			err,
 			messages.POSTGRES_FAILED_TO_EXECUTE_UPDATE,
 		).ConsoleLog()

@@ -221,6 +221,21 @@ func (rc *RockClient) CatchUpWithPrimary() {
 	}
 }
 
+func (rc *RockClient) GetGenesisHash() string {
+	rawGenesis, err := rc.db.GetCF(rc.ro, rc.columnHandles[COL_META], []byte("gen"))
+	if err != nil {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(rc.GetGenesisHash),
+			err,
+			messages.ROCKSDB_FAILED_GENESIS,
+		).ConsoleLog()
+	}
+	defer rawGenesis.Free()
+
+	return hex.EncodeToString(rawGenesis.Data())
+}
+
 func (rc *RockClient) Close() {
 	rc.db.Close()
 }
