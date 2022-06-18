@@ -22,7 +22,7 @@ const (
 	extrinsicFailedCall  = "ExtrinsicFailed"
 	evmLogCall           = "Log"
 	ethereumExecutedCall = "Executed"
-	ethereumModule       = "Ethereum"
+	ethereumModule       = "ethereum"
 
 	// messages
 	EVENT_CLIENT_STARTING                  = "Starting events client with %d workers"
