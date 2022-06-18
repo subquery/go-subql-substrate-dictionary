@@ -22,15 +22,16 @@ const (
 
 type (
 	Orchestrator struct {
-		configuration      config.Config
-		pgClient           *postgres.PostgresClient
-		rdbClient          *rocksdb.RockClient
-		specversionClient  *specversion.SpecVersionClient
-		extrinsicClient    *extrinsic.ExtrinsicClient
-		eventClient        *event.EventClient
-		metadataClient     *metadata.MetadataClient
-		extrinsicHeight    uint64
-		lastProcessedBlock int
+		configuration              config.Config
+		pgClient                   *postgres.PostgresClient
+		rdbClient                  *rocksdb.RockClient
+		specversionClient          *specversion.SpecVersionClient
+		extrinsicClient            *extrinsic.ExtrinsicClient
+		eventClient                *event.EventClient
+		metadataClient             *metadata.MetadataClient
+		extrinsicHeight            uint64
+		lastProcessedBlock         int
+		lastProcessedExtrinsicChan chan int
 	}
 )
 
@@ -130,15 +131,18 @@ func NewOrchestrator(
 	metadataClient.SetIndexerHealthy(true)
 	metadataClient.UpdateTargetHeight(lastBlock)
 
+	lastExtrinsicChan := make(chan int, 20)
+
 	return &Orchestrator{
-		configuration:      config,
-		pgClient:           pgClient,
-		rdbClient:          rdbClient,
-		specversionClient:  specVersionClient,
-		extrinsicClient:    extrinsicClient,
-		eventClient:        eventClient,
-		metadataClient:     metadataClient,
-		lastProcessedBlock: lastBlock,
+		configuration:              config,
+		pgClient:                   pgClient,
+		rdbClient:                  rdbClient,
+		specversionClient:          specVersionClient,
+		extrinsicClient:            extrinsicClient,
+		eventClient:                eventClient,
+		metadataClient:             metadataClient,
+		lastProcessedBlock:         lastBlock,
+		lastProcessedExtrinsicChan: lastExtrinsicChan,
 	}
 }
 
@@ -174,7 +178,8 @@ func (orchestrator *Orchestrator) runExtrinsics() {
 		startingBlock,
 	).ConsoleLog()
 
-	atomic.StoreUint64(&orchestrator.extrinsicHeight, uint64(startingBlock))
+	// atomic.StoreUint64(&orchestrator.extrinsicHeight, uint64(startingBlock))
+	orchestrator.lastProcessedExtrinsicChan <- startingBlock
 
 	for {
 		for blockHeight := startingBlock + 1; blockHeight <= lastBlock; blockHeight++ {
@@ -184,7 +189,8 @@ func (orchestrator *Orchestrator) runExtrinsics() {
 			if blockHeight%orchestrator.configuration.ClientsConfig.Extrinsics.BatchSize == 0 {
 				extrinsicBatchChannel.Close()
 				orchestrator.extrinsicClient.WaitForBatchDbInsertion()
-				atomic.StoreUint64(&orchestrator.extrinsicHeight, uint64(blockHeight))
+				// atomic.StoreUint64(&orchestrator.extrinsicHeight, uint64(blockHeight))
+				orchestrator.lastProcessedExtrinsicChan <- blockHeight
 				extrinsicBatchChannel = orchestrator.extrinsicClient.StartBatch()
 
 				orchestrator.metadataClient.UpdateRowCountEstimates()
@@ -203,7 +209,8 @@ func (orchestrator *Orchestrator) runExtrinsics() {
 		if lastBlock%orchestrator.configuration.ClientsConfig.Extrinsics.BatchSize != 0 {
 			extrinsicBatchChannel.Close()
 			orchestrator.extrinsicClient.WaitForBatchDbInsertion()
-			atomic.StoreUint64(&orchestrator.extrinsicHeight, uint64(lastBlock))
+			// atomic.StoreUint64(&orchestrator.extrinsicHeight, uint64(lastBlock))
+			orchestrator.lastProcessedExtrinsicChan <- lastBlock
 			extrinsicBatchChannel = orchestrator.extrinsicClient.StartBatch()
 
 			orchestrator.metadataClient.UpdateRowCountEstimates()
@@ -225,6 +232,12 @@ func (orchestrator *Orchestrator) runExtrinsics() {
 
 func (orchestrator *Orchestrator) runEvents() {
 	workerName := "EVENT"
+
+	go func() {
+		for lastExtrinsic := range orchestrator.lastProcessedExtrinsicChan {
+			atomic.StoreUint64(&orchestrator.extrinsicHeight, uint64(lastExtrinsic))
+		}
+	}()
 
 	eventBatchChannel := orchestrator.eventClient.StartBatch()
 	lastProcessedEvent := orchestrator.eventClient.RecoverLastInsertedBlock()
