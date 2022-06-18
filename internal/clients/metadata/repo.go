@@ -50,6 +50,7 @@ func (repoClient *metadataRepoClient) initTables(
 	tablesEstimates []RowCountEstimate,
 	genesisHash string,
 	chainName string,
+	specName string,
 ) {
 	query := fmt.Sprintf(
 		`INSERT INTO %s(%s,%s,"%s","%s") VALUES
@@ -77,6 +78,7 @@ func (repoClient *metadataRepoClient) initTables(
 	jsonNil, _ := json.Marshal(nil)
 	genesisHashJSON, _ := json.Marshal(genesisHash)
 	chainNameJSON, _ := json.Marshal(chainName)
+	specNameJSON, _ := json.Marshal(specName)
 
 	tableEstimatesJson, err := json.Marshal(tablesEstimates)
 	if err != nil {
@@ -95,7 +97,7 @@ func (repoClient *metadataRepoClient) initTables(
 		lastProcessedTimestamp, currentTimestamp, timestampString, timestampString,
 		targetHeight, 0, timestampString, timestampString,
 		chain, chainNameJSON, timestampString, timestampString,
-		specName, jsonString, timestampString, timestampString,
+		specName, specNameJSON, timestampString, timestampString,
 		genesisHash, genesisHashJSON, timestampString, timestampString,
 		indexerHealthy, jsonBool, timestampString, timestampString,
 		indexerNodeVersion, jsonString, timestampString, timestampString,
@@ -150,38 +152,17 @@ func (repoClient *metadataRepoClient) getTablesName() []string {
 }
 
 // getLastProcessedHeight return the last block height entirely finished by the dictionary indexer
-func (repoClient *metadataRepoClient) updateLastProcessedHeight() {
-	var blockHeight int
-	query := "SELECT block_height FROM events ORDER BY block_height DESC LIMIT 1"
-
-	err := repoClient.Pool.QueryRow(
-		context.Background(),
-		query,
-	).Scan(&blockHeight)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return
-		}
-
-		messages.NewDictionaryMessage(
-			messages.LOG_LEVEL_ERROR,
-			messages.GetComponent(repoClient.updateLastProcessedHeight),
-			err,
-			META_FAILED_DB,
-		).ConsoleLog()
-	}
-
+func (repoClient *metadataRepoClient) updateLastProcessedHeight(blockHeight int) {
 	updateQuery := `UPDATE _metadata SET 
 		value=$1, "updatedAt"=$2 
-		WHERE key='lastProcessedHeight' AND value!=$3`
+		WHERE key='lastProcessedHeight'`
 
 	timestampInt, timestampString := getTimestamp()
-	_, err = repoClient.Pool.Exec(
+	_, err := repoClient.Pool.Exec(
 		context.Background(),
 		updateQuery,
 		blockHeight,
 		timestampString,
-		blockHeight,
 	)
 	if err != nil {
 		messages.NewDictionaryMessage(
@@ -268,14 +249,13 @@ func (repoClient *metadataRepoClient) setIndexerHealthy(healthy bool) {
 func (repoClient *metadataRepoClient) updateLastProcessedTimestamp(timestampInt int, timestampString string) {
 	query := `UPDATE _metadata SET 
 	value=$1, "updatedAt"=$2
-	WHERE key='lastProcessedTimestamp' AND value!=$3`
+	WHERE key='lastProcessedTimestamp'`
 
 	_, err := repoClient.Pool.Exec(
 		context.Background(),
 		query,
 		timestampInt,
 		timestampString,
-		timestampInt,
 	)
 	if err != nil {
 		messages.NewDictionaryMessage(
@@ -285,4 +265,38 @@ func (repoClient *metadataRepoClient) updateLastProcessedTimestamp(timestampInt 
 			messages.POSTGRES_FAILED_TO_EXECUTE_UPDATE,
 		).ConsoleLog()
 	}
+}
+
+func (repoClient *metadataRepoClient) updateRowsEstimate(tablesEstimates []RowCountEstimate) {
+	query := `UPDATE _metadata SET
+	value=$1, "updatedAt"=$2
+	WHERE key='rowCountEstimate'`
+
+	timestampInt, timestampString := getTimestamp()
+	tableEstimatesJson, err := json.Marshal(tablesEstimates)
+	if err != nil {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(repoClient.initTables),
+			err,
+			META_FAILED_JSON_MARSHAL,
+			"table estimates",
+		).ConsoleLog()
+	}
+
+	_, err = repoClient.Pool.Exec(
+		context.Background(),
+		query,
+		tableEstimatesJson,
+		timestampString,
+	)
+	if err != nil {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(repoClient.updateRowsEstimate),
+			err,
+			messages.POSTGRES_FAILED_TO_EXECUTE_UPDATE,
+		).ConsoleLog()
+	}
+	repoClient.updateLastProcessedTimestamp(timestampInt, timestampString)
 }

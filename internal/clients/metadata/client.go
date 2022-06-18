@@ -42,7 +42,7 @@ func NewMetadataClient(
 	}
 }
 
-func (client *MetadataClient) Run() {
+func (client *MetadataClient) Run(specName string) {
 	messages.NewDictionaryMessage(
 		messages.LOG_LEVEL_INFO,
 		"",
@@ -60,9 +60,8 @@ func (client *MetadataClient) Run() {
 		tablesEstimates,
 		"0x"+genesisHash,
 		chainName,
+		specName,
 	)
-
-	go client.updateStatusLive()
 }
 
 // getRowCountEstimates calculates the list with the row counts estimates for each table
@@ -74,17 +73,6 @@ func (client *MetadataClient) getRowCountEstimates() []RowCountEstimate {
 		tablesEstimates[idx].Table = tableName
 	}
 	return tablesEstimates
-}
-
-// updateStatusLive modifies the metadata rows live
-func (client *MetadataClient) updateStatusLive() {
-	client.pgClient.setIndexerHealthy(true)
-	defer client.pgClient.setIndexerHealthy(false)
-	for {
-		client.pgClient.updateLastProcessedHeight()
-		//TODO: update only row estimates here
-		//TODO: update last processed height and target height in orchestrator(events)
-	}
 }
 
 func (client *MetadataClient) getChainName() string {
@@ -115,4 +103,27 @@ func (client *MetadataClient) getChainName() string {
 	}
 
 	return v.Result.(string)
+}
+
+func (client *MetadataClient) UpdateLastProcessedHeight(blockHeight int) {
+	go func() {
+		client.pgClient.updateLastProcessedHeight(blockHeight)
+	}()
+}
+
+func (client *MetadataClient) UpdateTargetHeight(blockHeight int) {
+	go func() {
+		client.pgClient.updateTargetHeight(blockHeight)
+	}()
+}
+
+func (client *MetadataClient) UpdateRowCountEstimates() {
+	go func() {
+		tablesEstimates := client.getRowCountEstimates()
+		client.pgClient.updateRowsEstimate(tablesEstimates)
+	}()
+}
+
+func (client *MetadataClient) SetIndexerHealthy(healthy bool) {
+	client.pgClient.setIndexerHealthy(healthy)
 }
