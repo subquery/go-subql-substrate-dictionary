@@ -188,6 +188,37 @@ func (specVClient *SpecVersionClient) getSpecVersion(height int) int {
 	return v.ToRuntimeVersion().SpecVersion
 }
 
+// GetSpecName return spec version name
+func (specVClient *SpecVersionClient) GetSpecName() string {
+	hash := specVClient.rocksdbClient.GetBlockHash(firstChainBlock)
+	msg := fmt.Sprintf(SPEC_VERSION_MESSAGE, hash)
+	reqBody := bytes.NewBuffer([]byte(msg))
+	resp, postErr := http.Post(specVClient.httpEndpoint, "application/json", reqBody)
+	if postErr != nil {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(specVClient.GetSpecName),
+			postErr,
+			SPEC_VERSION_FAILED_POST_MESSAGE,
+			firstChainBlock,
+		).ConsoleLog()
+	}
+
+	v := &rpc.JsonRpcResult{}
+	jsonDecodeErr := json.NewDecoder(resp.Body).Decode(&v)
+	if jsonDecodeErr != nil {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(specVClient.GetSpecName),
+			jsonDecodeErr,
+			SPEC_VERSION_FAILED_TO_DECODE,
+			firstChainBlock,
+		).ConsoleLog()
+	}
+
+	return v.ToRuntimeVersion().SpecName
+}
+
 // GetLastBlockForSpecVersion uses binary search to look between start and end block heights for the last node for a spec version
 func (specVClient *SpecVersionClient) getLastBlockForSpecVersion(specVersion, start, end int) int {
 	s := start

@@ -38,7 +38,8 @@ type (
 )
 
 const (
-	bodyTypeString = "Vec<Bytes>"
+	bodyTypeString  = "Vec<Bytes>"
+	firstChainBlock = 1
 )
 
 func NewExtrinsicClient(
@@ -117,7 +118,7 @@ func (client *ExtrinsicClient) RecoverLastInsertedBlock() int {
 			nil,
 			EXTRINSICS_NO_PREVIOUS_WORK,
 		).ConsoleLog()
-		return 1
+		return firstChainBlock
 	}
 
 	return lastBlock

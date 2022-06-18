@@ -40,6 +40,10 @@ type (
 	}
 )
 
+const (
+	firstChainBlock = 1
+)
+
 func NewEventClient(
 	pgClient *postgres.PostgresClient,
 	rocksdbClient *rocksdb.RockClient,
@@ -107,7 +111,7 @@ func (client *EventClient) RecoverLastInsertedBlock() int {
 			nil,
 			EVENT_NO_PREVIOUS_WORK,
 		).ConsoleLog()
-		return 1 //return first chain block
+		return firstChainBlock
 	}
 	return lastBlock
 }
@@ -157,9 +161,6 @@ func (client *EventClient) startWorker() {
 				switch eventCall {
 				// ignore extrinsic success as all extrinsics status was initiated with "true"
 				case extrinsicSuccessCall:
-					{
-
-					}
 				case extrinsicFailedCall:
 					extrinsicUpdate := Event{
 						Id:          getEventExtrinsicId(job.BlockHeight, evtValue),
@@ -171,10 +172,12 @@ func (client *EventClient) startWorker() {
 					eventModel := Event{
 						Id:          fmt.Sprintf("%d-%d", job.BlockHeight, eventsCounter),
 						Module:      getEventModule(job.BlockHeight, evtValue),
-						Event:       getEventCall(job.BlockHeight, evtValue),
+						Event:       eventCall,
 						BlockHeight: job.BlockHeight,
 					}
 					client.pgClient.insertEvent(&eventModel)
+
+					//TODO: check that the module is "evm"?
 
 					eventParams := getEvmLogParams(job.BlockHeight, evtValue)
 					evmLog := EvmLog{
@@ -183,14 +186,14 @@ func (client *EventClient) startWorker() {
 						BlockHeight: job.BlockHeight,
 						Topics:      getEvmLogTopics(job.BlockHeight, eventParams),
 					}
-					client.pgClient.insertEvent(&evmLog)
 
+					client.pgClient.insertEvent(&evmLog)
 					eventsCounter++
 				case ethereumExecutedCall:
 					eventModel := Event{
 						Id:          fmt.Sprintf("%d-%d", job.BlockHeight, eventsCounter),
 						Module:      getEventModule(job.BlockHeight, evtValue),
-						Event:       getEventCall(job.BlockHeight, evtValue),
+						Event:       eventCall,
 						BlockHeight: job.BlockHeight,
 					}
 					client.pgClient.insertEvent(&eventModel)
@@ -208,12 +211,13 @@ func (client *EventClient) startWorker() {
 						To:      getEvmTransactionToHash(job.BlockHeight, evmTransactionParams),
 						Success: getEvmTransactionStatus(job.BlockHeight, evmTransactionParams),
 					}
+
 					client.pgClient.insertEvent(&evmTransaction)
 				default:
 					eventModel := Event{
 						Id:          fmt.Sprintf("%d-%d", job.BlockHeight, eventsCounter),
 						Module:      getEventModule(job.BlockHeight, evtValue),
-						Event:       getEventCall(job.BlockHeight, evtValue),
+						Event:       eventCall,
 						BlockHeight: job.BlockHeight,
 					}
 					client.pgClient.insertEvent(&eventModel)

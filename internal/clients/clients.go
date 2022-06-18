@@ -3,6 +3,7 @@ package clients
 import (
 	"go-dictionary/internal/clients/event"
 	"go-dictionary/internal/clients/extrinsic"
+	"go-dictionary/internal/clients/metadata"
 	"go-dictionary/internal/clients/specversion"
 	"go-dictionary/internal/config"
 	"go-dictionary/internal/db/postgres"
@@ -27,6 +28,7 @@ type (
 		specversionClient  *specversion.SpecVersionClient
 		extrinsicClient    *extrinsic.ExtrinsicClient
 		eventClient        *event.EventClient
+		metadataClient     *metadata.MetadataClient
 		extrinsicHeight    uint64
 		lastProcessedBlock int
 	}
@@ -78,10 +80,11 @@ func NewOrchestrator(
 		pgClient,
 		config.ChainConfig.HttpRpcEndpoint,
 	)
+
 	// quickfix
 	event.FixPolkdotEventDecoder()
-
 	specVersionClient.Run()
+	specName := specVersionClient.GetSpecName()
 
 	// EXTRINSIC - extrinsic client
 	extrinsicClient := extrinsic.NewExtrinsicClient(
@@ -117,6 +120,16 @@ func NewOrchestrator(
 		config.ClientsConfig.Events.BatchSize,
 	).ConsoleLog()
 
+	// METADATA - metadata client
+	metadataClient := metadata.NewMetadataClient(
+		pgClient,
+		rdbClient,
+		config.ChainConfig.HttpRpcEndpoint,
+	)
+	metadataClient.Run(specName)
+	metadataClient.SetIndexerHealthy(true)
+	metadataClient.UpdateTargetHeight(lastBlock)
+
 	return &Orchestrator{
 		configuration:      config,
 		pgClient:           pgClient,
@@ -124,6 +137,7 @@ func NewOrchestrator(
 		specversionClient:  specVersionClient,
 		extrinsicClient:    extrinsicClient,
 		eventClient:        eventClient,
+		metadataClient:     metadataClient,
 		lastProcessedBlock: lastBlock,
 	}
 }
@@ -135,6 +149,7 @@ func (orchestrator *Orchestrator) Run() {
 		nil,
 		ORCHESTRATOR_START,
 	).ConsoleLog()
+	defer orchestrator.metadataClient.SetIndexerHealthy(false)
 
 	go orchestrator.runExtrinsics()
 	go orchestrator.runEvents()
@@ -172,6 +187,8 @@ func (orchestrator *Orchestrator) runExtrinsics() {
 				atomic.StoreUint64(&orchestrator.extrinsicHeight, uint64(blockHeight))
 				extrinsicBatchChannel = orchestrator.extrinsicClient.StartBatch()
 
+				orchestrator.metadataClient.UpdateRowCountEstimates()
+
 				messages.NewDictionaryMessage(
 					messages.LOG_LEVEL_SUCCESS,
 					"",
@@ -188,6 +205,8 @@ func (orchestrator *Orchestrator) runExtrinsics() {
 			orchestrator.extrinsicClient.WaitForBatchDbInsertion()
 			atomic.StoreUint64(&orchestrator.extrinsicHeight, uint64(lastBlock))
 			extrinsicBatchChannel = orchestrator.extrinsicClient.StartBatch()
+
+			orchestrator.metadataClient.UpdateRowCountEstimates()
 
 			messages.NewDictionaryMessage(
 				messages.LOG_LEVEL_SUCCESS,
@@ -234,6 +253,9 @@ func (orchestrator *Orchestrator) runEvents() {
 				orchestrator.eventClient.WaitForBatchDbInsertion()
 				eventBatchChannel = orchestrator.eventClient.StartBatch()
 
+				orchestrator.metadataClient.UpdateLastProcessedHeight(blockHeight)
+				orchestrator.metadataClient.UpdateRowCountEstimates()
+
 				messages.NewDictionaryMessage(
 					messages.LOG_LEVEL_SUCCESS,
 					"",
@@ -249,6 +271,9 @@ func (orchestrator *Orchestrator) runEvents() {
 			eventBatchChannel.Close()
 			orchestrator.eventClient.WaitForBatchDbInsertion()
 			eventBatchChannel = orchestrator.eventClient.StartBatch()
+
+			orchestrator.metadataClient.UpdateLastProcessedHeight(lastExtrinsicBlockHeight)
+			orchestrator.metadataClient.UpdateRowCountEstimates()
 
 			messages.NewDictionaryMessage(
 				messages.LOG_LEVEL_SUCCESS,
@@ -283,6 +308,9 @@ func (orchestrator *Orchestrator) getLastSyncedBlock() int {
 		if lastBlock != orchestrator.lastProcessedBlock && lastBlock >= firstChainBlock {
 			orchestrator.specversionClient.UpdateLive(lastBlock)
 			orchestrator.lastProcessedBlock = lastBlock
+
+			orchestrator.metadataClient.UpdateTargetHeight(lastBlock)
+
 			return lastBlock
 		}
 	}

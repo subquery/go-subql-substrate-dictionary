@@ -6,7 +6,7 @@
     },
     "clients_config": {
         "events": {
-            "workers": 100,
+            "workers": 2,
             "batch_size": 200
         },
         "extrinsics": {
