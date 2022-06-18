@@ -127,8 +127,6 @@ func (repoClient *eventRepoClient) startDbWorker() {
 				updateEvmTransactions = append(updateEvmTransactions, toBeUpdatedEvmTransaction)
 			}
 			updateEvmTransactionCounter++
-		default:
-			// fmt.Println("WHAT IS DAT?", event)
 		}
 
 	}

@@ -86,8 +86,6 @@ func (repoClient *extrinsicRepoClient) startDbWorker() {
 				insertEvmTransactions = append(insertEvmTransactions, toBeInsertedEvmTransactions)
 			}
 			evmTransactionsCounter++
-		default:
-			fmt.Println("ASMDIAMSIDMIADSMI?")
 		}
 
 	}
