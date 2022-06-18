@@ -50,7 +50,7 @@ func (repoClient *metadataRepoClient) initTables(
 	tablesEstimates []RowCountEstimate,
 	genesisHash string,
 	chainName string,
-	specName string,
+	specNameV string,
 ) {
 	query := fmt.Sprintf(
 		`INSERT INTO %s(%s,%s,"%s","%s") VALUES
@@ -78,7 +78,7 @@ func (repoClient *metadataRepoClient) initTables(
 	jsonNil, _ := json.Marshal(nil)
 	genesisHashJSON, _ := json.Marshal(genesisHash)
 	chainNameJSON, _ := json.Marshal(chainName)
-	specNameJSON, _ := json.Marshal(specName)
+	specNameJSON, _ := json.Marshal(specNameV)
 
 	tableEstimatesJson, err := json.Marshal(tablesEstimates)
 	if err != nil {
