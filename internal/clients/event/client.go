@@ -152,6 +152,7 @@ func (client *EventClient) startWorker() {
 			for _, evt := range eventsArray {
 				evtValue := evt.(map[string]interface{})
 				eventCall := getEventCall(job.BlockHeight, evtValue)
+				eventModule := getEventModule(job.BlockHeight, evtValue)
 
 				switch eventCall {
 				// ignore extrinsic success as all extrinsics status was initiated with "true"
@@ -194,6 +195,10 @@ func (client *EventClient) startWorker() {
 					}
 					client.pgClient.insertEvent(&eventModel)
 					eventsCounter++
+
+					if eventModule != ethereumModule {
+						break
+					}
 
 					evmTransactionParams := getEvmTransactionParams(job.BlockHeight, evtValue)
 					evmTransaction := models.EvmTransaction{

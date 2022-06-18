@@ -179,8 +179,9 @@ func (client *ExtrinsicClient) startWorker() {
 
 				decodedExtrinsic := extrinsicDecoder.Value.(map[string]interface{})
 				extrinsicCallModule := decodedExtrinsic[extrinsicCallModuleField]
+				extrinsicCallFunction := decodedExtrinsic[extrinsicFunctionField]
 
-				if extrinsicCallModule == ethereumTransactModule {
+				if extrinsicCallModule == ethereumTransactModule && extrinsicCallFunction == ethereumTransactCallFunction {
 					evmTransaction := models.EvmTransaction{
 						Id:          fmt.Sprintf("%d-%d", job.BlockHeight, idx),
 						TxHash:      "",

@@ -18,15 +18,11 @@ const (
 	eventParamsTopics  = "topics"
 	extrinsicIdField   = "extrinsic_idx"
 
-	extrinsicSuccessType = "0000"
-	extrinsicFailedType  = "0001"
-	evmLogType           = "3300"
-	ethereumExecutedType = "3400"
-
 	extrinsicSuccessCall = "ExtrinsicSuccess"
 	extrinsicFailedCall  = "ExtrinsicFailed"
 	evmLogCall           = "Log"
 	ethereumExecutedCall = "Executed"
+	ethereumModule       = "Ethereum"
 
 	// messages
 	EVENT_CLIENT_STARTING                  = "Starting events client with %d workers"
