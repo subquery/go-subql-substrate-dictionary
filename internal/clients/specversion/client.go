@@ -160,7 +160,7 @@ func (specVClient *SpecVersionClient) Run() {
 // GetSpecVersion downloads the spec version for a block using the HTTP RPC endpoint
 func (specVClient *SpecVersionClient) getSpecVersion(height int) int {
 	hash := specVClient.rocksdbClient.GetBlockHash(height)
-	msg := fmt.Sprintf(SPEC_VERSION_MESSAGE, hash)
+	msg := fmt.Sprintf(SPEC_VERSION_MESSAGE, hexPrefix+hash)
 	reqBody := bytes.NewBuffer([]byte(msg))
 	resp, postErr := http.Post(specVClient.httpEndpoint, "application/json", reqBody)
 	if postErr != nil {
@@ -260,7 +260,7 @@ func (specVClient *SpecVersionClient) getAllDbSpecVersions() SpecVersionRangeLis
 // getMetadata retrieves the metadata structure for a block height
 func (specVClient *SpecVersionClient) getMetadata(blockHeight int) *types.MetadataStruct {
 	hash := specVClient.rocksdbClient.GetBlockHash(blockHeight)
-	reqBody := bytes.NewBuffer([]byte(rpc.StateGetMetadata(1, hash)))
+	reqBody := bytes.NewBuffer([]byte(rpc.StateGetMetadata(1, hexPrefix+hash)))
 	resp, err := http.Post(specVClient.httpEndpoint, "application/json", reqBody)
 	if err != nil {
 		messages.NewDictionaryMessage(

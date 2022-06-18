@@ -49,6 +49,14 @@ func NewOrchestrator(
 	// Rocksdb connect
 	rdbClient := rocksdb.OpenRocksdb(config.RocksdbConfig)
 	lastBlock := rdbClient.GetLastBlockSynced()
+	if lastBlock == 0 {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(NewOrchestrator),
+			nil,
+			ORCHESTRATOR_FAILED_TO_GET_LAST_SYNCED_BLOCK,
+		).ConsoleLog()
+	}
 
 	// Register custom types
 	c, err := ioutil.ReadFile(config.ChainConfig.DecoderTypesFile)
