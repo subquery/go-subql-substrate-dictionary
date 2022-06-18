@@ -191,7 +191,7 @@ func (specVClient *SpecVersionClient) getSpecVersion(height int) int {
 // GetSpecName return spec version name
 func (specVClient *SpecVersionClient) GetSpecName() string {
 	hash := specVClient.rocksdbClient.GetBlockHash(firstChainBlock)
-	msg := fmt.Sprintf(SPEC_VERSION_MESSAGE, hash)
+	msg := fmt.Sprintf(SPEC_VERSION_MESSAGE, hexPrefix+hash)
 	reqBody := bytes.NewBuffer([]byte(msg))
 	resp, postErr := http.Post(specVClient.httpEndpoint, "application/json", reqBody)
 	if postErr != nil {
