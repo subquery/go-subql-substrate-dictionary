@@ -23,6 +23,11 @@ const (
 	evmLogType           = "3300"
 	ethereumExecutedType = "3400"
 
+	extrinsicSuccessCall = "ExtrinsicSuccess"
+	extrinsicFailedCall  = "ExtrinsicFailed"
+	evmLogCall           = "Log"
+	ethereumExecutedCall = "Executed"
+
 	// messages
 	EVENT_CLIENT_STARTING                  = "Starting events client with %d workers"
 	EVENT_STATE_ROOT_NOT_FOUND             = "State root hash was not found in the block header"

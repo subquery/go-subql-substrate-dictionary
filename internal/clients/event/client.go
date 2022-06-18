@@ -152,22 +152,21 @@ func (client *EventClient) startWorker() {
 			for _, evt := range eventsArray {
 				evtValue := evt.(map[string]interface{})
 				eventCall := getEventCall(job.BlockHeight, evtValue)
-				eventType := getEventType(job.BlockHeight, evtValue)
 
-				switch eventType {
+				switch eventCall {
 				// ignore extrinsic success as all extrinsics status was initiated with "true"
-				case extrinsicSuccessType:
+				case extrinsicSuccessCall:
 					{
 
 					}
-				case extrinsicFailedType:
+				case extrinsicFailedCall:
 					extrinsicUpdate := Event{
 						Id:          getEventExtrinsicId(job.BlockHeight, evtValue),
 						Event:       eventCall,
 						BlockHeight: updateExtrinsicCommand,
 					}
 					client.pgClient.insertEvent(&extrinsicUpdate)
-				case evmLogType:
+				case evmLogCall:
 					eventModel := Event{
 						Id:          fmt.Sprintf("%d-%d", job.BlockHeight, eventsCounter),
 						Module:      getEventModule(job.BlockHeight, evtValue),
@@ -186,7 +185,7 @@ func (client *EventClient) startWorker() {
 					client.pgClient.insertEvent(&evmLog)
 
 					eventsCounter++
-				case ethereumExecutedType:
+				case ethereumExecutedCall:
 					eventModel := Event{
 						Id:          fmt.Sprintf("%d-%d", job.BlockHeight, eventsCounter),
 						Module:      getEventModule(job.BlockHeight, evtValue),

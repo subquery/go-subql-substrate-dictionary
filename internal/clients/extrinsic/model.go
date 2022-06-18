@@ -10,6 +10,8 @@ const (
 	extrinsicParamsInputField = "input"
 	ethereumTransactType      = "3400"
 
+	ethereumTransactModule = "Ethereum"
+
 	// messages
 	EXTRINSIC_DECODE_FAILED                 = "Failed to decode extrinsic for block %d"
 	EXTRINSIC_FIELD_FAILED                  = "Failed to get extrinsic %s for block %d"
