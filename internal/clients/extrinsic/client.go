@@ -157,10 +157,11 @@ func (client *ExtrinsicClient) startWorker() {
 				).ConsoleLog()
 			}
 
-			specVersionMeta := client.specVersionClient.GetSpecVersionAndMetadata(job.BlockHeight)
+			specVersionMeta := client.specVersionClient.GetSpecVersion(job.BlockHeight)
 			specVersion, _ := strconv.Atoi(specVersionMeta.SpecVersion)
+			metadata := client.specVersionClient.GetMetadata()
 			if extrinsicDecoderOption.Spec != specVersion {
-				extrinsicDecoderOption.Metadata = specVersionMeta.Meta
+				extrinsicDecoderOption.Metadata = metadata
 				extrinsicDecoderOption.Spec = specVersion
 			}
 

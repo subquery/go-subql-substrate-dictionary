@@ -141,10 +141,11 @@ func (client *EventClient) startWorker() {
 			stateRootKey := getStateRootFromRawHeader(decodedHeader)
 			rawEvents := client.readRawEvent(stateRootKey)
 
-			specVersionMeta := client.specVersionClient.GetSpecVersionAndMetadata(job.BlockHeight)
+			specVersionMeta := client.specVersionClient.GetSpecVersion(job.BlockHeight)
 			specVersion, _ := strconv.Atoi(specVersionMeta.SpecVersion)
+			metadata := client.specVersionClient.GetMetadata()
 			if eventDecoderOption.Spec != specVersion {
-				eventDecoderOption.Metadata = specVersionMeta.Meta
+				eventDecoderOption.Metadata = metadata
 				eventDecoderOption.Spec = specVersion
 			}
 

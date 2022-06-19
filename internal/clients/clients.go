@@ -10,9 +10,7 @@ import (
 	"go-dictionary/internal/db/rocksdb"
 	"go-dictionary/internal/messages"
 	"io/ioutil"
-	"sync/atomic"
 
-	scalecodec "github.com/itering/scale.go"
 	"github.com/itering/scale.go/source"
 	"github.com/itering/scale.go/types"
 )
@@ -30,10 +28,9 @@ type (
 		extrinsicClient            *extrinsic.ExtrinsicClient
 		eventClient                *event.EventClient
 		metadataClient             *metadata.MetadataClient
-		extrinsicHeight            uint64
 		lastProcessedBlock         int
 		lastProcessedExtrinsicChan chan int
-		metaDecode                 *scalecodec.MetadataDecoder
+		finishedEvents             chan struct{}
 	}
 )
 
@@ -134,6 +131,7 @@ func NewOrchestrator(
 	metadataClient.UpdateTargetHeight(lastBlock)
 
 	lastExtrinsicChan := make(chan int, 20)
+	finishedEvents := make(chan struct{}, 1)
 
 	return &Orchestrator{
 		configuration:              config,
@@ -145,7 +143,7 @@ func NewOrchestrator(
 		metadataClient:             metadataClient,
 		lastProcessedBlock:         lastBlock,
 		lastProcessedExtrinsicChan: lastExtrinsicChan,
-		metaDecode:                 &scalecodec.MetadataDecoder{},
+		finishedEvents:             finishedEvents,
 	}
 }
 
@@ -170,7 +168,6 @@ func (orchestrator *Orchestrator) runExtrinsics() {
 
 	extrinsicBatchChannel := orchestrator.extrinsicClient.StartBatch()
 	startingBlock := orchestrator.extrinsicClient.RecoverLastInsertedBlock()
-	lastBlock := orchestrator.rdbClient.GetLastBlockSynced()
 
 	messages.NewDictionaryMessage(
 		messages.LOG_LEVEL_INFO,
@@ -181,19 +178,27 @@ func (orchestrator *Orchestrator) runExtrinsics() {
 		startingBlock,
 	).ConsoleLog()
 
-	// atomic.StoreUint64(&orchestrator.extrinsicHeight, uint64(startingBlock))
-	orchestrator.lastProcessedExtrinsicChan <- startingBlock
+	lastBlock := orchestrator.rdbClient.GetLastBlockSynced()
+	currentSpecv := orchestrator.specversionClient.GetSpecVersion(startingBlock)
+	orchestrator.specversionClient.UpdateMetadata(startingBlock)
+	if startingBlock != firstChainBlock {
+		orchestrator.lastProcessedExtrinsicChan <- startingBlock
+		<-orchestrator.finishedEvents //waiting for events to sync
+	}
 
 	for {
-		for blockHeight := startingBlock + 1; blockHeight <= lastBlock; blockHeight++ {
+		if lastBlock > currentSpecv.Last {
+			currentSpecv = orchestrator.specversionClient.GetSpecVersion(startingBlock + 1)
+			orchestrator.specversionClient.UpdateMetadata(startingBlock + 1) //TODO: update only if new spec
+		}
+
+		for blockHeight := startingBlock + 1; blockHeight <= currentSpecv.Last; blockHeight++ {
 			lookupKey := orchestrator.rdbClient.GetLookupKeyForBlockHeight(blockHeight)
 			extrinsicBatchChannel.SendWork(blockHeight, lookupKey)
 
 			if blockHeight%orchestrator.configuration.ClientsConfig.Extrinsics.BatchSize == 0 {
 				extrinsicBatchChannel.Close()
 				orchestrator.extrinsicClient.WaitForBatchDbInsertion()
-				// atomic.StoreUint64(&orchestrator.extrinsicHeight, uint64(blockHeight))
-				orchestrator.lastProcessedExtrinsicChan <- blockHeight
 				extrinsicBatchChannel = orchestrator.extrinsicClient.StartBatch()
 
 				orchestrator.metadataClient.UpdateRowCountEstimates()
@@ -209,11 +214,9 @@ func (orchestrator *Orchestrator) runExtrinsics() {
 			}
 		}
 
-		if lastBlock%orchestrator.configuration.ClientsConfig.Extrinsics.BatchSize != 0 {
+		if currentSpecv.Last%orchestrator.configuration.ClientsConfig.Extrinsics.BatchSize != 0 {
 			extrinsicBatchChannel.Close()
 			orchestrator.extrinsicClient.WaitForBatchDbInsertion()
-			// atomic.StoreUint64(&orchestrator.extrinsicHeight, uint64(lastBlock))
-			orchestrator.lastProcessedExtrinsicChan <- lastBlock
 			extrinsicBatchChannel = orchestrator.extrinsicClient.StartBatch()
 
 			orchestrator.metadataClient.UpdateRowCountEstimates()
@@ -224,23 +227,19 @@ func (orchestrator *Orchestrator) runExtrinsics() {
 				nil,
 				ORCHESTRATOR_FINISH_BATCH,
 				workerName,
-				lastBlock,
+				currentSpecv.Last,
 			).ConsoleLog()
 		}
 
-		startingBlock = lastBlock
+		orchestrator.lastProcessedExtrinsicChan <- currentSpecv.Last
+		<-orchestrator.finishedEvents //waiting for events to sync
+		startingBlock = currentSpecv.Last
 		lastBlock = orchestrator.getLastSyncedBlock()
 	}
 }
 
 func (orchestrator *Orchestrator) runEvents() {
 	workerName := "EVENT"
-
-	go func() {
-		for lastExtrinsic := range orchestrator.lastProcessedExtrinsicChan {
-			atomic.StoreUint64(&orchestrator.extrinsicHeight, uint64(lastExtrinsic))
-		}
-	}()
 
 	eventBatchChannel := orchestrator.eventClient.StartBatch()
 	lastProcessedEvent := orchestrator.eventClient.RecoverLastInsertedBlock()
@@ -254,29 +253,13 @@ func (orchestrator *Orchestrator) runEvents() {
 		lastProcessedEvent,
 	).ConsoleLog()
 
-	currentSpecVersion := orchestrator.specversionClient.GetSpecVersionAndMetadata(lastProcessedEvent)
-	orchestrator.specversionClient.GetMetadata(lastProcessedEvent)
+	for lastExtrinsicBlockHeight = range orchestrator.lastProcessedExtrinsicChan {
+		// if lastExtrinsicBlockHeight == lastProcessedEvent {
+		// 	orchestrator.finishedEvents <- struct{}{}
+		// 	continue
+		// }
 
-	for {
-		lastExtrinsicBlockHeight = int(atomic.LoadUint64(&orchestrator.extrinsicHeight))
-		if lastExtrinsicBlockHeight <= lastProcessedEvent {
-			continue
-		}
-
-		newSpecVersion := orchestrator.specversionClient.GetSpecVersionAndMetadata(lastProcessedEvent + 1)
-		if newSpecVersion.SpecVersion != currentSpecVersion.SpecVersion {
-			currentSpecVersion = newSpecVersion
-			orchestrator.specversionClient.GetMetadata(lastProcessedEvent)
-		}
-
-		last := 0
-		if currentSpecVersion.Last < lastExtrinsicBlockHeight {
-			last = currentSpecVersion.Last
-		} else {
-			last = lastExtrinsicBlockHeight
-		}
-
-		for blockHeight := lastProcessedEvent + 1; blockHeight <= last; blockHeight++ {
+		for blockHeight := lastProcessedEvent + 1; blockHeight <= lastExtrinsicBlockHeight; blockHeight++ {
 			lookupKey := orchestrator.rdbClient.GetLookupKeyForBlockHeight(blockHeight)
 			eventBatchChannel.SendWork(blockHeight, lookupKey)
 
@@ -318,6 +301,7 @@ func (orchestrator *Orchestrator) runEvents() {
 		}
 
 		lastProcessedEvent = lastExtrinsicBlockHeight
+		orchestrator.finishedEvents <- struct{}{}
 	}
 }
 

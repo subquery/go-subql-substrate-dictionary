@@ -2,8 +2,6 @@ package specversion
 
 import (
 	"go-dictionary/internal/messages"
-
-	"github.com/itering/scale.go/types"
 )
 
 const (
@@ -26,7 +24,6 @@ const (
 	META_FAILED_SCALE_DECODE   = "Failed to scale decode metadata for block %d"
 	META_STARTING              = "Metadata info is retrieved from the rpc endpoint"
 	META_FINISHED              = "Metadata client successfully finished processing"
-	META_FAILED_COPY           = "Failed to copy metadata structure into another structure"
 
 	hexPrefix = "0x"
 )
@@ -36,7 +33,6 @@ type (
 		SpecVersion string `json:"spec_version"`
 		First       int    `json:"first"` //first block for a spec version
 		Last        int    `json:"last"`  //last block for a spec version
-		Meta        *types.MetadataStruct
 	}
 
 	SpecVersionRangeList []SpecVersionRange

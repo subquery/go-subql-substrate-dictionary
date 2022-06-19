@@ -15,7 +15,6 @@ import (
 	"github.com/itering/scale.go/types"
 	"github.com/itering/scale.go/utiles"
 	"github.com/itering/substrate-api-rpc/rpc"
-	"github.com/jinzhu/copier"
 
 	scalecodec "github.com/itering/scale.go"
 )
@@ -85,10 +84,6 @@ func (specVClient *SpecVersionClient) Run() {
 		specVClient.specVersionRangeList = specVClient.pgClient.getAllSpecVersionData()
 		specVClient.specVersionRangeList.FillLast(specVClient.lastBlock)
 		insertPosition = len(specVClient.specVersionRangeList)
-
-		for i := 0; i < len(specVClient.specVersionRangeList); i++ {
-			specVClient.specVersionRangeList[i].Meta = specVClient.GetMetadata(specVClient.specVersionRangeList[i].First)
-		}
 	}
 
 	// if last block in db is equal to last block indexed by node, simply return the info about the blocks in db
@@ -133,7 +128,6 @@ func (specVClient *SpecVersionClient) Run() {
 				Last:        actualLastBlock,
 				First:       first,
 				SpecVersion: currentSpecVersionString,
-				Meta:        specVClient.GetMetadata(first),
 			})
 			shouldInsert = true
 		} else {
@@ -291,15 +285,15 @@ func (specVClient *SpecVersionClient) getAllDbSpecVersions() SpecVersionRangeLis
 	return specVersions
 }
 
-// getMetadata retrieves the metadata structure for a block height
-func (specVClient *SpecVersionClient) GetMetadata(blockHeight int) *types.MetadataStruct {
+// UpdateMetadata updates the metadata structure for a block height
+func (specVClient *SpecVersionClient) UpdateMetadata(blockHeight int) {
 	hash := specVClient.rocksdbClient.GetBlockHash(blockHeight)
 	reqBody := bytes.NewBuffer([]byte(rpc.StateGetMetadata(1, hexPrefix+hash)))
 	resp, err := http.Post(specVClient.httpEndpoint, "application/json", reqBody)
 	if err != nil {
 		messages.NewDictionaryMessage(
 			messages.LOG_LEVEL_ERROR,
-			messages.GetComponent(specVClient.GetMetadata),
+			messages.GetComponent(specVClient.UpdateMetadata),
 			err,
 			META_FAILED_POST_MESSAGE,
 			blockHeight,
@@ -313,7 +307,7 @@ func (specVClient *SpecVersionClient) GetMetadata(blockHeight int) *types.Metada
 	if err != nil {
 		messages.NewDictionaryMessage(
 			messages.LOG_LEVEL_ERROR,
-			messages.GetComponent(specVClient.GetMetadata),
+			messages.GetComponent(specVClient.UpdateMetadata),
 			err,
 			META_FAILED_TO_DECODE_BODY,
 			blockHeight,
@@ -325,29 +319,20 @@ func (specVClient *SpecVersionClient) GetMetadata(blockHeight int) *types.Metada
 	if err != nil {
 		messages.NewDictionaryMessage(
 			messages.LOG_LEVEL_ERROR,
-			messages.GetComponent(specVClient.GetMetadata),
+			messages.GetComponent(specVClient.UpdateMetadata),
 			err,
 			META_FAILED_SCALE_DECODE,
 			blockHeight,
 		).ConsoleLog()
 	}
+}
 
-	returnedMetadata := types.MetadataStruct{}
-	err = copier.Copy(&returnedMetadata, &specVClient.metadataDecoder.Metadata)
-	if err != nil {
-		messages.NewDictionaryMessage(
-			messages.LOG_LEVEL_ERROR,
-			messages.GetComponent(specVClient.GetMetadata),
-			err,
-			META_FAILED_COPY,
-		).ConsoleLog()
-	}
-
-	return &returnedMetadata
+func (specVClient *SpecVersionClient) GetMetadata() *types.MetadataStruct {
+	return &specVClient.metadataDecoder.Metadata
 }
 
 // GetSpecVersionAndMetadata returns the spec version and the metadata for a given block height
-func (specVClient *SpecVersionClient) GetSpecVersionAndMetadata(blockHeight int) *SpecVersionRange {
+func (specVClient *SpecVersionClient) GetSpecVersion(blockHeight int) *SpecVersionRange {
 	specVClient.RLock()
 	defer specVClient.RUnlock()
 	return specVClient.specVersionRangeList.getSpecVersionForBlock(blockHeight)
@@ -398,7 +383,6 @@ func (specVClient *SpecVersionClient) UpdateLive(lastBlock int) {
 				Last:        actualLastBlock,
 				First:       first,
 				SpecVersion: currentSpecVersionString,
-				Meta:        specVClient.GetMetadata(first),
 			})
 			shouldInsert = true
 		} else {
