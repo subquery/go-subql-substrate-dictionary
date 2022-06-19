@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"sync/atomic"
 
+	scalecodec "github.com/itering/scale.go"
 	"github.com/itering/scale.go/source"
 	"github.com/itering/scale.go/types"
 )
@@ -32,6 +33,7 @@ type (
 		extrinsicHeight            uint64
 		lastProcessedBlock         int
 		lastProcessedExtrinsicChan chan int
+		metaDecode                 *scalecodec.MetadataDecoder
 	}
 )
 
@@ -83,7 +85,7 @@ func NewOrchestrator(
 	)
 
 	// quickfix
-	event.FixPolkdotEventDecoder()
+	// event.FixPolkdotEventDecoder()
 	specVersionClient.Run()
 	specName := specVersionClient.GetSpecName()
 
@@ -143,6 +145,7 @@ func NewOrchestrator(
 		metadataClient:             metadataClient,
 		lastProcessedBlock:         lastBlock,
 		lastProcessedExtrinsicChan: lastExtrinsicChan,
+		metaDecode:                 &scalecodec.MetadataDecoder{},
 	}
 }
 
@@ -251,13 +254,29 @@ func (orchestrator *Orchestrator) runEvents() {
 		lastProcessedEvent,
 	).ConsoleLog()
 
+	currentSpecVersion := orchestrator.specversionClient.GetSpecVersionAndMetadata(lastProcessedEvent)
+	orchestrator.specversionClient.GetMetadata(lastProcessedEvent)
+
 	for {
 		lastExtrinsicBlockHeight = int(atomic.LoadUint64(&orchestrator.extrinsicHeight))
 		if lastExtrinsicBlockHeight <= lastProcessedEvent {
 			continue
 		}
 
-		for blockHeight := lastProcessedEvent + 1; blockHeight <= lastExtrinsicBlockHeight; blockHeight++ {
+		newSpecVersion := orchestrator.specversionClient.GetSpecVersionAndMetadata(lastProcessedEvent + 1)
+		if newSpecVersion.SpecVersion != currentSpecVersion.SpecVersion {
+			currentSpecVersion = newSpecVersion
+			orchestrator.specversionClient.GetMetadata(lastProcessedEvent)
+		}
+
+		last := 0
+		if currentSpecVersion.Last < lastExtrinsicBlockHeight {
+			last = currentSpecVersion.Last
+		} else {
+			last = lastExtrinsicBlockHeight
+		}
+
+		for blockHeight := lastProcessedEvent + 1; blockHeight <= last; blockHeight++ {
 			lookupKey := orchestrator.rdbClient.GetLookupKeyForBlockHeight(blockHeight)
 			eventBatchChannel.SendWork(blockHeight, lookupKey)
 

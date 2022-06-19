@@ -15,6 +15,7 @@ import (
 	"github.com/itering/scale.go/types"
 	"github.com/itering/scale.go/utiles"
 	"github.com/itering/substrate-api-rpc/rpc"
+	"github.com/jinzhu/copier"
 
 	scalecodec "github.com/itering/scale.go"
 )
@@ -27,6 +28,7 @@ type (
 		pgClient             specvRepoClient
 		httpEndpoint         string
 		specVersionRangeList SpecVersionRangeList
+		metadataDecoder      *scalecodec.MetadataDecoder
 	}
 
 	specvRepoClient struct {
@@ -48,10 +50,11 @@ func NewSpecVersionClient(
 	pgClient *postgres.PostgresClient,
 	httpRpcEndpoint string) *SpecVersionClient {
 	return &SpecVersionClient{
-		lastBlock:     lastBlock,
-		rocksdbClient: rocksdbClient,
-		pgClient:      specvRepoClient{pgClient},
-		httpEndpoint:  httpRpcEndpoint,
+		lastBlock:       lastBlock,
+		rocksdbClient:   rocksdbClient,
+		pgClient:        specvRepoClient{pgClient},
+		httpEndpoint:    httpRpcEndpoint,
+		metadataDecoder: &scalecodec.MetadataDecoder{},
 	}
 }
 
@@ -84,7 +87,7 @@ func (specVClient *SpecVersionClient) Run() {
 		insertPosition = len(specVClient.specVersionRangeList)
 
 		for i := 0; i < len(specVClient.specVersionRangeList); i++ {
-			specVClient.specVersionRangeList[i].Meta = specVClient.getMetadata(specVClient.specVersionRangeList[i].First)
+			specVClient.specVersionRangeList[i].Meta = specVClient.GetMetadata(specVClient.specVersionRangeList[i].First)
 		}
 	}
 
@@ -130,7 +133,7 @@ func (specVClient *SpecVersionClient) Run() {
 				Last:        actualLastBlock,
 				First:       first,
 				SpecVersion: currentSpecVersionString,
-				Meta:        specVClient.getMetadata(first),
+				Meta:        specVClient.GetMetadata(first),
 			})
 			shouldInsert = true
 		} else {
@@ -289,14 +292,14 @@ func (specVClient *SpecVersionClient) getAllDbSpecVersions() SpecVersionRangeLis
 }
 
 // getMetadata retrieves the metadata structure for a block height
-func (specVClient *SpecVersionClient) getMetadata(blockHeight int) *types.MetadataStruct {
+func (specVClient *SpecVersionClient) GetMetadata(blockHeight int) *types.MetadataStruct {
 	hash := specVClient.rocksdbClient.GetBlockHash(blockHeight)
 	reqBody := bytes.NewBuffer([]byte(rpc.StateGetMetadata(1, hexPrefix+hash)))
 	resp, err := http.Post(specVClient.httpEndpoint, "application/json", reqBody)
 	if err != nil {
 		messages.NewDictionaryMessage(
 			messages.LOG_LEVEL_ERROR,
-			messages.GetComponent(specVClient.getMetadata),
+			messages.GetComponent(specVClient.GetMetadata),
 			err,
 			META_FAILED_POST_MESSAGE,
 			blockHeight,
@@ -310,27 +313,37 @@ func (specVClient *SpecVersionClient) getMetadata(blockHeight int) *types.Metada
 	if err != nil {
 		messages.NewDictionaryMessage(
 			messages.LOG_LEVEL_ERROR,
-			messages.GetComponent(specVClient.getMetadata),
+			messages.GetComponent(specVClient.GetMetadata),
 			err,
 			META_FAILED_TO_DECODE_BODY,
 			blockHeight,
 		).ConsoleLog()
 	}
 
-	metaDecoder := scalecodec.MetadataDecoder{}
-	metaDecoder.Init(utiles.HexToBytes(metaBodyString))
-	err = metaDecoder.Process()
+	specVClient.metadataDecoder.Init(utiles.HexToBytes(metaBodyString))
+	err = specVClient.metadataDecoder.Process()
 	if err != nil {
 		messages.NewDictionaryMessage(
 			messages.LOG_LEVEL_ERROR,
-			messages.GetComponent(specVClient.getMetadata),
+			messages.GetComponent(specVClient.GetMetadata),
 			err,
 			META_FAILED_SCALE_DECODE,
 			blockHeight,
 		).ConsoleLog()
 	}
 
-	return &metaDecoder.Metadata
+	returnedMetadata := types.MetadataStruct{}
+	err = copier.Copy(&returnedMetadata, &specVClient.metadataDecoder.Metadata)
+	if err != nil {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(specVClient.GetMetadata),
+			err,
+			META_FAILED_COPY,
+		).ConsoleLog()
+	}
+
+	return &returnedMetadata
 }
 
 // GetSpecVersionAndMetadata returns the spec version and the metadata for a given block height
@@ -385,7 +398,7 @@ func (specVClient *SpecVersionClient) UpdateLive(lastBlock int) {
 				Last:        actualLastBlock,
 				First:       first,
 				SpecVersion: currentSpecVersionString,
-				Meta:        specVClient.getMetadata(first),
+				Meta:        specVClient.GetMetadata(first),
 			})
 			shouldInsert = true
 		} else {

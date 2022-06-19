@@ -26,6 +26,7 @@ const (
 	META_FAILED_SCALE_DECODE   = "Failed to scale decode metadata for block %d"
 	META_STARTING              = "Metadata info is retrieved from the rpc endpoint"
 	META_FINISHED              = "Metadata client successfully finished processing"
+	META_FAILED_COPY           = "Failed to copy metadata structure into another structure"
 
 	hexPrefix = "0x"
 )
