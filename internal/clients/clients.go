@@ -88,7 +88,7 @@ func NewOrchestrator(
 	extrinsicClient := extrinsic.NewExtrinsicClient(
 		pgClient,
 		rdbClient,
-		config.ClientsConfig.Extrinsics.Workers,
+		config.ClientsConfig.ExtrinsicsWorkers,
 		specVersionClient,
 	)
 	extrinsicClient.Run()
@@ -98,14 +98,14 @@ func NewOrchestrator(
 		nil,
 		ORCHESTRATOR_BATCH_SIZE,
 		"Extrinsic",
-		config.ClientsConfig.Extrinsics.BatchSize,
+		config.ClientsConfig.BatchSize,
 	).ConsoleLog()
 
 	// EVENTS - event client
 	eventClient := event.NewEventClient(
 		pgClient,
 		rdbClient,
-		config.ClientsConfig.Events.Workers,
+		config.ClientsConfig.EventsWorkers,
 		specVersionClient,
 	)
 	eventClient.Run()
@@ -115,7 +115,7 @@ func NewOrchestrator(
 		nil,
 		ORCHESTRATOR_BATCH_SIZE,
 		"Event",
-		config.ClientsConfig.Events.BatchSize,
+		config.ClientsConfig.BatchSize,
 	).ConsoleLog()
 
 	// METADATA - metadata client
@@ -125,6 +125,7 @@ func NewOrchestrator(
 		config.ChainConfig.HttpRpcEndpoint,
 	)
 	metadataClient.Run(specName)
+	metadataClient.UpdateRowCountEstimates()
 	metadataClient.SetIndexerHealthy(true)
 	metadataClient.UpdateTargetHeight(lastBlock)
 
@@ -167,6 +168,10 @@ func (orchestrator *Orchestrator) Run() {
 		startingEvent,
 	).ConsoleLog()
 
+	lastBlock := orchestrator.rdbClient.GetLastBlockSynced()
+	currentSpecv := orchestrator.specversionClient.GetSpecVersion(startingExtrinsic)
+	orchestrator.specversionClient.UpdateMetadata(startingExtrinsic)
+
 	// sync events if left behind
 	if startingEvent < startingExtrinsic {
 		for blockHeight := startingEvent + 1; blockHeight <= startingExtrinsic; blockHeight++ {
@@ -191,34 +196,53 @@ func (orchestrator *Orchestrator) Run() {
 		).ConsoleLog()
 	}
 
-	lastBlock := orchestrator.rdbClient.GetLastBlockSynced()
-	currentSpecv := orchestrator.specversionClient.GetSpecVersion(startingExtrinsic)
-	orchestrator.specversionClient.UpdateMetadata(startingExtrinsic)
-
 	for {
-		if lastBlock > currentSpecv.Last {
-			currentSpecv = orchestrator.specversionClient.GetSpecVersion(startingExtrinsic + 1)
-			orchestrator.specversionClient.UpdateMetadata(startingExtrinsic + 1) //TODO: update only if new spec
-		}
+		for lastBlock >= currentSpecv.Last {
+			if lastBlock > currentSpecv.Last {
+				newSpecv := orchestrator.specversionClient.GetSpecVersion(startingExtrinsic + 1)
+				if newSpecv.SpecVersion != currentSpecv.SpecVersion {
+					currentSpecv = newSpecv
+					orchestrator.specversionClient.UpdateMetadata(startingExtrinsic + 1)
+				}
+			}
 
-		//TODO: go over all spec versions in order to not get stuck
-		for blockHeight := startingExtrinsic + 1; blockHeight <= currentSpecv.Last; blockHeight++ {
-			lookupKey := orchestrator.rdbClient.GetLookupKeyForBlockHeight(blockHeight)
-			extrinsicBatchChannel.SendWork(blockHeight, lookupKey)
-			eventBatchChannel.SendWork(blockHeight, lookupKey)
+			for blockHeight := startingExtrinsic + 1; blockHeight <= currentSpecv.Last; blockHeight++ {
+				lookupKey := orchestrator.rdbClient.GetLookupKeyForBlockHeight(blockHeight)
+				extrinsicBatchChannel.SendWork(blockHeight, lookupKey)
+				eventBatchChannel.SendWork(blockHeight, lookupKey)
 
-			if blockHeight%orchestrator.configuration.ClientsConfig.Extrinsics.BatchSize == 0 {
-				//TODO: use a wg
+				if blockHeight%orchestrator.configuration.ClientsConfig.BatchSize == 0 {
+					extrinsicBatchChannel.Close()
+					orchestrator.extrinsicClient.WaitForBatchDbInsertion()
+					eventBatchChannel.Close()
+					orchestrator.eventClient.WaitForBatchDbInsertion()
+
+					extrinsicBatchChannel = orchestrator.extrinsicClient.StartBatch()
+					eventBatchChannel = orchestrator.eventClient.StartBatch()
+
+					orchestrator.metadataClient.UpdateLastProcessedHeight(blockHeight)
+
+					messages.NewDictionaryMessage(
+						messages.LOG_LEVEL_SUCCESS,
+						"",
+						nil,
+						ORCHESTRATOR_FINISH_BATCH,
+						workerExtrinsic,
+						blockHeight,
+					).ConsoleLog()
+				}
+			}
+
+			if currentSpecv.Last%orchestrator.configuration.ClientsConfig.BatchSize != 0 {
 				extrinsicBatchChannel.Close()
 				orchestrator.extrinsicClient.WaitForBatchDbInsertion()
-				extrinsicBatchChannel = orchestrator.extrinsicClient.StartBatch()
-
 				eventBatchChannel.Close()
 				orchestrator.eventClient.WaitForBatchDbInsertion()
+
+				extrinsicBatchChannel = orchestrator.extrinsicClient.StartBatch()
 				eventBatchChannel = orchestrator.eventClient.StartBatch()
 
-				orchestrator.metadataClient.UpdateLastProcessedHeight(blockHeight)
-				orchestrator.metadataClient.UpdateRowCountEstimates()
+				orchestrator.metadataClient.UpdateLastProcessedHeight(currentSpecv.Last)
 
 				messages.NewDictionaryMessage(
 					messages.LOG_LEVEL_SUCCESS,
@@ -226,34 +250,16 @@ func (orchestrator *Orchestrator) Run() {
 					nil,
 					ORCHESTRATOR_FINISH_BATCH,
 					workerExtrinsic,
-					blockHeight,
+					currentSpecv.Last,
 				).ConsoleLog()
+			}
+
+			startingExtrinsic = currentSpecv.Last
+			if lastBlock == currentSpecv.Last {
+				break
 			}
 		}
 
-		if currentSpecv.Last%orchestrator.configuration.ClientsConfig.Extrinsics.BatchSize != 0 {
-			extrinsicBatchChannel.Close()
-			orchestrator.extrinsicClient.WaitForBatchDbInsertion()
-			extrinsicBatchChannel = orchestrator.extrinsicClient.StartBatch()
-
-			eventBatchChannel.Close()
-			orchestrator.eventClient.WaitForBatchDbInsertion()
-			eventBatchChannel = orchestrator.eventClient.StartBatch()
-
-			orchestrator.metadataClient.UpdateLastProcessedHeight(currentSpecv.Last)
-			orchestrator.metadataClient.UpdateRowCountEstimates()
-
-			messages.NewDictionaryMessage(
-				messages.LOG_LEVEL_SUCCESS,
-				"",
-				nil,
-				ORCHESTRATOR_FINISH_BATCH,
-				workerExtrinsic,
-				currentSpecv.Last,
-			).ConsoleLog()
-		}
-
-		startingExtrinsic = currentSpecv.Last
 		lastBlock = orchestrator.getLastSyncedBlock()
 	}
 }

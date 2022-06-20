@@ -14,14 +14,10 @@ type ChainConfig struct {
 	DecoderTypesFile string `json:"decoder_types_file"`
 }
 
-type ClientData struct {
-	Workers   int `json:"workers"`
-	BatchSize int `json:"batch_size"`
-}
-
 type ClientsConfig struct {
-	Events     ClientData `json:"events"`
-	Extrinsics ClientData `json:"extrinsics"`
+	EventsWorkers     int `json:"events_workers"`
+	ExtrinsicsWorkers int `json:"extrinsics_workers"`
+	BatchSize         int `json:"batch_size"`
 }
 
 type RocksdbConfig struct {
