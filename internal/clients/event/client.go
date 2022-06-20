@@ -9,7 +9,6 @@ import (
 	"go-dictionary/internal/db/rocksdb"
 	"go-dictionary/internal/messages"
 	"go-dictionary/models"
-	"strconv"
 	"strings"
 
 	trieNode "go-dictionary/internal/trie/node"
@@ -68,7 +67,7 @@ func NewEventClient(
 	}
 }
 
-func (client *EventClient) Run() {
+func (client *EventClient) Run(isEvm bool) {
 	messages.NewDictionaryMessage(
 		messages.LOG_LEVEL_INFO,
 		"",
@@ -77,10 +76,18 @@ func (client *EventClient) Run() {
 		client.workersCount,
 	).ConsoleLog()
 
-	go client.pgClient.startDbWorker()
+	if isEvm {
+		go client.pgClient.evmStartDbWorker()
 
-	for i := 0; i < client.workersCount; i++ {
-		go client.startWorker()
+		for i := 0; i < client.workersCount; i++ {
+			go client.evmStartWorker()
+		}
+	} else {
+		go client.pgClient.startDbWorker()
+
+		for i := 0; i < client.workersCount; i++ {
+			go client.startWorker()
+		}
 	}
 }
 
@@ -111,7 +118,7 @@ func (client *EventClient) RecoverLastInsertedBlock() int {
 			nil,
 			EVENT_NO_PREVIOUS_WORK,
 		).ConsoleLog()
-		return firstChainBlock
+		return 0
 	}
 	return lastBlock
 }
@@ -121,14 +128,15 @@ func (eventBatchChan *EventBatchChannel) Close() {
 }
 
 // SendWork will send a job to the event workers
-func (eventBatchChan *EventBatchChannel) SendWork(blockHeight int, lookupKey []byte) {
+func (eventBatchChan *EventBatchChannel) SendWork(blockHeight int, lookupKey []byte, specVersion int) {
 	eventBatchChan.batchChannel <- &eventJob{
 		BlockHeight:    blockHeight,
 		BlockLookupKey: lookupKey,
+		SpecVersion:    specVersion,
 	}
 }
 
-func (client *EventClient) startWorker() {
+func (client *EventClient) evmStartWorker() {
 	headerDecoder := types.ScaleDecoder{}
 	eventDecoder := scale.EventsDecoder{}
 	eventDecoderOption := types.ScaleDecoderOption{Metadata: nil, Spec: -1}
@@ -141,12 +149,10 @@ func (client *EventClient) startWorker() {
 			stateRootKey := getStateRootFromRawHeader(decodedHeader)
 			rawEvents := client.readRawEvent(stateRootKey)
 
-			specVersionMeta := client.specVersionClient.GetSpecVersion(job.BlockHeight)
-			specVersion, _ := strconv.Atoi(specVersionMeta.SpecVersion)
 			metadata := client.specVersionClient.GetMetadata()
-			if eventDecoderOption.Spec != specVersion {
+			if eventDecoderOption.Spec != job.SpecVersion {
 				eventDecoderOption.Metadata = metadata
-				eventDecoderOption.Spec = specVersion
+				eventDecoderOption.Spec = job.SpecVersion
 			}
 
 			eventDecoder.Init(types.ScaleBytes{Data: rawEvents}, &eventDecoderOption)
@@ -172,13 +178,16 @@ func (client *EventClient) startWorker() {
 				case evmLogCall:
 					eventModel := Event{
 						Id:          fmt.Sprintf("%d-%d", job.BlockHeight, eventsCounter),
-						Module:      getEventModule(job.BlockHeight, evtValue),
+						Module:      eventModule,
 						Event:       eventCall,
 						BlockHeight: job.BlockHeight,
 					}
 					client.pgClient.insertEvent(&eventModel)
 
 					//TODO: check that the module is "evm"?
+					if eventModule != evmModule {
+						break
+					}
 
 					eventParams := getEvmLogParams(job.BlockHeight, evtValue)
 					evmLog := EvmLog{
@@ -193,7 +202,7 @@ func (client *EventClient) startWorker() {
 				case ethereumExecutedCall:
 					eventModel := Event{
 						Id:          fmt.Sprintf("%d-%d", job.BlockHeight, eventsCounter),
-						Module:      getEventModule(job.BlockHeight, evtValue),
+						Module:      eventModule,
 						Event:       eventCall,
 						BlockHeight: job.BlockHeight,
 					}
@@ -214,6 +223,61 @@ func (client *EventClient) startWorker() {
 					}
 
 					client.pgClient.insertEvent(&evmTransaction)
+				default:
+					eventModel := Event{
+						Id:          fmt.Sprintf("%d-%d", job.BlockHeight, eventsCounter),
+						Module:      eventModule,
+						Event:       eventCall,
+						BlockHeight: job.BlockHeight,
+					}
+					client.pgClient.insertEvent(&eventModel)
+					eventsCounter++
+				}
+			}
+		}
+		// send nil event when work is done
+		client.pgClient.insertEvent(nil)
+	}
+}
+
+func (client *EventClient) startWorker() {
+	headerDecoder := types.ScaleDecoder{}
+	eventDecoder := scale.EventsDecoder{}
+	eventDecoderOption := types.ScaleDecoderOption{Metadata: nil, Spec: -1}
+
+	for jobChan := range client.batchChan {
+		for job := range jobChan {
+			rawHeaderData := client.rocksdbClient.GetHeaderForBlockLookupKey(job.BlockLookupKey)
+			headerDecoder.Init(types.ScaleBytes{Data: rawHeaderData}, nil)
+			decodedHeader := headerDecoder.ProcessAndUpdateData(headerTypeString)
+			stateRootKey := getStateRootFromRawHeader(decodedHeader)
+			rawEvents := client.readRawEvent(stateRootKey)
+
+			metadata := client.specVersionClient.GetMetadata()
+			if eventDecoderOption.Spec != job.SpecVersion {
+				eventDecoderOption.Metadata = metadata
+				eventDecoderOption.Spec = job.SpecVersion
+			}
+
+			eventDecoder.Init(types.ScaleBytes{Data: rawEvents}, &eventDecoderOption)
+			eventDecoder.Process()
+
+			eventsCounter := 0
+			eventsArray := eventDecoder.Value.([]interface{})
+			for _, evt := range eventsArray {
+				evtValue := evt.(map[string]interface{})
+				eventCall := getEventCall(job.BlockHeight, evtValue)
+
+				switch eventCall {
+				// ignore extrinsic success as all extrinsics status was initiated with "true"
+				case extrinsicSuccessCall:
+				case extrinsicFailedCall:
+					extrinsicUpdate := Event{
+						Id:          getEventExtrinsicId(job.BlockHeight, evtValue),
+						Event:       eventCall,
+						BlockHeight: updateExtrinsicCommand,
+					}
+					client.pgClient.insertEvent(&extrinsicUpdate)
 				default:
 					eventModel := Event{
 						Id:          fmt.Sprintf("%d-%d", job.BlockHeight, eventsCounter),

@@ -7,7 +7,7 @@
     "clients_config": {
         "events_workers": 150,
         "extrinsics_workers": 100,
-        "batch_size": 1000
+        "batch_size": 500
     },
     "chain_config": {
         "http_rpc_endpoint": "http://127.0.0.1:9933",

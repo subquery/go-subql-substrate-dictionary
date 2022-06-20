@@ -28,7 +28,6 @@ require (
 	github.com/jackc/pgservicefile v0.0.0-20200714003250-2b9c44734f2b // indirect
 	github.com/jackc/pgtype v1.10.0 // indirect
 	github.com/jackc/puddle v1.2.1 // indirect
-	github.com/jinzhu/copier v0.3.5 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1 // indirect
 	github.com/minio/sha256-simd v0.1.1 // indirect

@@ -7,7 +7,6 @@ import (
 	"go-dictionary/internal/db/rocksdb"
 	"go-dictionary/internal/messages"
 	"go-dictionary/models"
-	"strconv"
 	"strings"
 
 	scale "github.com/itering/scale.go"
@@ -68,7 +67,7 @@ func NewExtrinsicClient(
 }
 
 // Run starts the extrinsics worker
-func (client *ExtrinsicClient) Run() {
+func (client *ExtrinsicClient) Run(isEvm bool) {
 	messages.NewDictionaryMessage(
 		messages.LOG_LEVEL_INFO,
 		"",
@@ -77,12 +76,22 @@ func (client *ExtrinsicClient) Run() {
 		client.workersCount,
 	).ConsoleLog()
 
-	go client.pgClient.startDbWorker()
+	if isEvm {
+		go client.pgClient.evmStartDbWorker()
 
-	count := 0
-	for count < client.workersCount {
-		go client.startWorker()
-		count++
+		count := 0
+		for count < client.workersCount {
+			go client.evmStartWorker()
+			count++
+		}
+	} else {
+		go client.pgClient.startDbWorker()
+
+		count := 0
+		for count < client.workersCount {
+			go client.startWorker()
+			count++
+		}
 	}
 }
 
@@ -118,7 +127,7 @@ func (client *ExtrinsicClient) RecoverLastInsertedBlock() int {
 			nil,
 			EXTRINSICS_NO_PREVIOUS_WORK,
 		).ConsoleLog()
-		return firstChainBlock
+		return 0
 	}
 
 	return lastBlock
@@ -129,10 +138,85 @@ func (extrinsicBatchChan *ExtrinsicBatchChannel) Close() {
 }
 
 // SendWork will send a job to the extrinsic workers
-func (extrinsicBatchChan *ExtrinsicBatchChannel) SendWork(blockHeight int, lookupKey []byte) {
+func (extrinsicBatchChan *ExtrinsicBatchChannel) SendWork(blockHeight int, lookupKey []byte, specVersion int) {
 	extrinsicBatchChan.batchChannel <- &ExtrinsicJob{
+		SpecVersion:    specVersion,
 		BlockHeight:    blockHeight,
 		BlockLookupKey: lookupKey,
+	}
+}
+
+func (client *ExtrinsicClient) evmStartWorker() {
+	bodyDecoder := types.ScaleDecoder{}
+	extrinsicDecoder := scale.ExtrinsicDecoder{}
+	extrinsicDecoderOption := types.ScaleDecoderOption{Metadata: nil, Spec: -1}
+
+	for jobChan := range client.batchChan {
+		for job := range jobChan {
+			rawBodyData := client.rocksdbClient.GetBodyForBlockLookupKey(job.BlockLookupKey)
+			bodyDecoder.Init(types.ScaleBytes{Data: rawBodyData}, nil)
+			decodedBody := bodyDecoder.ProcessAndUpdateData(bodyTypeString)
+
+			bodyList, ok := decodedBody.([]interface{})
+			if !ok {
+				messages.NewDictionaryMessage(
+					messages.LOG_LEVEL_ERROR,
+					messages.GetComponent(client.evmStartWorker),
+					nil,
+					messages.FAILED_TYPE_ASSERTION,
+				).ConsoleLog()
+			}
+
+			metadata := client.specVersionClient.GetMetadata()
+			if extrinsicDecoderOption.Spec != job.SpecVersion {
+				extrinsicDecoderOption.Metadata = metadata
+				extrinsicDecoderOption.Spec = job.SpecVersion
+			}
+
+			for idx, bodyInterface := range bodyList {
+				rawExtrinsic, ok := bodyInterface.(string)
+				if !ok {
+					messages.NewDictionaryMessage(
+						messages.LOG_LEVEL_ERROR,
+						messages.GetComponent(client.evmStartWorker),
+						nil,
+						messages.FAILED_TYPE_ASSERTION,
+					).ConsoleLog()
+				}
+
+				extrinsicDecoder.Init(types.ScaleBytes{Data: utiles.HexToBytes(rawExtrinsic)}, &extrinsicDecoderOption)
+				extrinsicDecoder.Process()
+
+				decodedExtrinsic := extrinsicDecoder.Value.(map[string]interface{})
+				extrinsicCallModule := getCallModule(job.BlockHeight, decodedExtrinsic)
+				extrinsicCallFunction := getCallFunction(job.BlockHeight, decodedExtrinsic)
+
+				if extrinsicCallModule == ethereumTransactModule && extrinsicCallFunction == ethereumTransactCallFunction {
+					evmTransaction := models.EvmTransaction{
+						Id:          fmt.Sprintf("%d-%d", job.BlockHeight, idx),
+						TxHash:      "",
+						From:        "",
+						To:          "",
+						Func:        getFunc(job.BlockHeight, decodedExtrinsic),
+						BlockHeight: job.BlockHeight,
+						Success:     true,
+					}
+					client.pgClient.insertExtrinsic(&evmTransaction)
+				}
+				extrinsicModel := Extrinsic{
+					Id:          fmt.Sprintf("%d-%d", job.BlockHeight, idx),
+					Module:      extrinsicCallModule,
+					Call:        extrinsicCallFunction,
+					BlockHeight: job.BlockHeight,
+					Success:     true, //the real value is get from events
+					TxHash:      getHash(job.BlockHeight, decodedExtrinsic, rawExtrinsic),
+					IsSigned:    isSigned(decodedExtrinsic),
+				}
+				client.pgClient.insertExtrinsic(&extrinsicModel)
+			}
+		}
+		// send a nil extrinsic when the work is done
+		client.pgClient.insertExtrinsic(nil)
 	}
 }
 
@@ -151,18 +235,16 @@ func (client *ExtrinsicClient) startWorker() {
 			if !ok {
 				messages.NewDictionaryMessage(
 					messages.LOG_LEVEL_ERROR,
-					messages.GetComponent(client.startWorker),
+					messages.GetComponent(client.evmStartWorker),
 					nil,
 					messages.FAILED_TYPE_ASSERTION,
 				).ConsoleLog()
 			}
 
-			specVersionMeta := client.specVersionClient.GetSpecVersion(job.BlockHeight)
-			specVersion, _ := strconv.Atoi(specVersionMeta.SpecVersion)
 			metadata := client.specVersionClient.GetMetadata()
-			if extrinsicDecoderOption.Spec != specVersion {
+			if extrinsicDecoderOption.Spec != job.SpecVersion {
 				extrinsicDecoderOption.Metadata = metadata
-				extrinsicDecoderOption.Spec = specVersion
+				extrinsicDecoderOption.Spec = job.SpecVersion
 			}
 
 			for idx, bodyInterface := range bodyList {
@@ -170,7 +252,7 @@ func (client *ExtrinsicClient) startWorker() {
 				if !ok {
 					messages.NewDictionaryMessage(
 						messages.LOG_LEVEL_ERROR,
-						messages.GetComponent(client.startWorker),
+						messages.GetComponent(client.evmStartWorker),
 						nil,
 						messages.FAILED_TYPE_ASSERTION,
 					).ConsoleLog()
@@ -180,21 +262,7 @@ func (client *ExtrinsicClient) startWorker() {
 				extrinsicDecoder.Process()
 
 				decodedExtrinsic := extrinsicDecoder.Value.(map[string]interface{})
-				extrinsicCallModule := decodedExtrinsic[extrinsicCallModuleField]
-				extrinsicCallFunction := decodedExtrinsic[extrinsicFunctionField]
 
-				if extrinsicCallModule == ethereumTransactModule && extrinsicCallFunction == ethereumTransactCallFunction {
-					evmTransaction := models.EvmTransaction{
-						Id:          fmt.Sprintf("%d-%d", job.BlockHeight, idx),
-						TxHash:      "",
-						From:        "",
-						To:          "",
-						Func:        getFunc(job.BlockHeight, decodedExtrinsic),
-						BlockHeight: job.BlockHeight,
-						Success:     true,
-					}
-					client.pgClient.insertExtrinsic(&evmTransaction)
-				}
 				extrinsicModel := Extrinsic{
 					Id:          fmt.Sprintf("%d-%d", job.BlockHeight, idx),
 					Module:      getCallModule(job.BlockHeight, decodedExtrinsic),

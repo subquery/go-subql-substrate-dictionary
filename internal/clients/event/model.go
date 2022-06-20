@@ -23,6 +23,7 @@ const (
 	evmLogCall           = "Log"
 	ethereumExecutedCall = "Executed"
 	ethereumModule       = "ethereum"
+	evmModule            = "evm"
 
 	// messages
 	EVENT_CLIENT_STARTING                  = "Starting events client with %d workers"
@@ -85,6 +86,7 @@ type (
 	eventJob struct {
 		BlockHeight    int
 		BlockLookupKey []byte
+		SpecVersion    int
 	}
 
 	EvmLog struct {

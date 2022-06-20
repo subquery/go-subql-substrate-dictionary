@@ -33,5 +33,6 @@ type (
 	ExtrinsicJob struct {
 		BlockHeight    int
 		BlockLookupKey []byte
+		SpecVersion    int
 	}
 )
