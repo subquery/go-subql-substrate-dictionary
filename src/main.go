@@ -13,7 +13,8 @@ func main() {
 		dictionaryConfiguration config.Config
 	)
 
-	flag.StringVar(&configFilePath, "configfile", "", "path to config file")
+	flag.StringVar(&configFilePath, "config", "", "path to config file")
+	flag.StringVar(&configFilePath, "c", "", "path to config file")
 	flag.Parse()
 	if configFilePath == "" {
 		messages.NewDictionaryMessage(messages.LOG_LEVEL_INFO, "", nil, messages.CONFIG_NO_CUSTOM_PATH_SPECIFIED).ConsoleLog()

@@ -8,7 +8,7 @@ const (
 	extrinsicSignatureField      = "signature"
 	extrinsicParamsField         = "params"
 	extrinsicParamsInputField    = "input"
-	ethereumTransactModule       = "Ethereum"
+	ethereumTransactModule       = "ethereum"
 	ethereumTransactCallFunction = "transact"
 
 	// messages
