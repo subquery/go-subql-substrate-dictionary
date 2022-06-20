@@ -31,7 +31,7 @@ type (
 		*postgres.PostgresClient
 		dbChan            chan interface{}
 		workersCount      int
-		batchFinishedChan chan struct{}
+		batchFinishedChan chan map[string]int
 	}
 
 	EventBatchChannel struct {
@@ -51,7 +51,7 @@ func NewEventClient(
 ) *EventClient {
 	batchChan := make(chan chan *eventJob, workersCount)
 	dbChan := make(chan interface{}, workersCount)
-	batchFinishedChan := make(chan struct{}, 1)
+	batchFinishedChan := make(chan map[string]int, 1)
 
 	return &EventClient{
 		pgClient: eventRepoClient{
@@ -105,8 +105,8 @@ func (client *EventClient) StartBatch() *EventBatchChannel {
 	return &eventBatchChannel
 }
 
-func (client *EventClient) WaitForBatchDbInsertion() {
-	<-client.pgClient.batchFinishedChan
+func (client *EventClient) WaitForBatchDbInsertion() map[string]int {
+	return <-client.pgClient.batchFinishedChan
 }
 
 func (client *EventClient) RecoverLastInsertedBlock() int {
@@ -166,8 +166,11 @@ func (client *EventClient) evmStartWorker() {
 				eventModule := getEventModule(job.BlockHeight, evtValue)
 
 				switch eventCall {
-				// ignore extrinsic success as all extrinsics status was initiated with "true"
 				case extrinsicSuccessCall:
+					extrinsicSuccess := Event{
+						BlockHeight: extrinsicSuccessCommand,
+					}
+					client.pgClient.insertEvent(&extrinsicSuccess)
 				case extrinsicFailedCall:
 					extrinsicUpdate := Event{
 						Id:          getEventExtrinsicId(job.BlockHeight, evtValue),
@@ -269,8 +272,11 @@ func (client *EventClient) startWorker() {
 				eventCall := getEventCall(job.BlockHeight, evtValue)
 
 				switch eventCall {
-				// ignore extrinsic success as all extrinsics status was initiated with "true"
 				case extrinsicSuccessCall:
+					extrinsicSuccess := Event{
+						BlockHeight: extrinsicSuccessCommand,
+					}
+					client.pgClient.insertEvent(&extrinsicSuccess)
 				case extrinsicFailedCall:
 					extrinsicUpdate := Event{
 						Id:          getEventExtrinsicId(job.BlockHeight, evtValue),

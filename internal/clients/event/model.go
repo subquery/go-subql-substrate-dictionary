@@ -6,7 +6,8 @@ const (
 	topicsLen           = 4
 
 	// negative block heights are used as commands
-	updateExtrinsicCommand = -1
+	updateExtrinsicCommand  = -1
+	extrinsicSuccessCommand = -2
 
 	// decoded event fields
 	eventIdField       = "event_idx"

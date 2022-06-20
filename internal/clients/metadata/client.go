@@ -117,11 +117,14 @@ func (client *MetadataClient) UpdateTargetHeight(blockHeight int) {
 	}()
 }
 
-func (client *MetadataClient) UpdateRowCountEstimates() {
-	go func() {
-		tablesEstimates := client.getRowCountEstimates()
-		client.pgClient.updateRowsEstimate(tablesEstimates)
-	}()
+func (client *MetadataClient) SetRowCountEstimates() []RowCountEstimate {
+	tablesEstimates := client.getRowCountEstimates()
+	client.pgClient.updateRowsEstimate(tablesEstimates)
+	return tablesEstimates
+}
+
+func (client *MetadataClient) UpdateRowCountEstimates(tableEstimates []RowCountEstimate) {
+	client.pgClient.updateRowsEstimate(tableEstimates)
 }
 
 func (client *MetadataClient) SetIndexerHealthy(healthy bool) {

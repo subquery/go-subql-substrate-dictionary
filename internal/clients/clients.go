@@ -30,6 +30,7 @@ type (
 		eventClient        *event.EventClient
 		metadataClient     *metadata.MetadataClient
 		lastProcessedBlock int
+		rowCountEstimate   []metadata.RowCountEstimate
 	}
 )
 
@@ -198,8 +199,8 @@ func (orchestrator *Orchestrator) Run() {
 		).ConsoleLog()
 	}
 
-	orchestrator.metadataClient.UpdateRowCountEstimates()
 	orchestrator.metadataClient.UpdateLastProcessedHeight(startingExtrinsic)
+	orchestrator.rowCountEstimate = orchestrator.metadataClient.SetRowCountEstimates()
 
 	for {
 		for lastBlock >= currentSpecv.Last {
@@ -265,6 +266,7 @@ func (orchestrator *Orchestrator) getLastSyncedBlock() int {
 			orchestrator.lastProcessedBlock = lastBlock
 
 			orchestrator.metadataClient.UpdateTargetHeight(lastBlock)
+			//TODO: update estimate
 
 			return lastBlock
 		}
@@ -281,7 +283,8 @@ func (orchestrator *Orchestrator) finishBatches(
 	extrinsicBatchChannel.Close()
 	orchestrator.extrinsicClient.WaitForBatchDbInsertion()
 	eventBatchChannel.Close()
-	orchestrator.eventClient.WaitForBatchDbInsertion()
+	lastInserts := orchestrator.eventClient.WaitForBatchDbInsertion()
+	orchestrator.updateTableEstimates(lastInserts)
 
 	extrBatchChan := orchestrator.extrinsicClient.StartBatch()
 	evBatchChan := orchestrator.eventClient.StartBatch()
@@ -298,4 +301,14 @@ func (orchestrator *Orchestrator) finishBatches(
 	).ConsoleLog()
 
 	return extrBatchChan, evBatchChan
+}
+
+// updateTableEstimates updates the local tables estimates and the database record
+func (orchestrator *Orchestrator) updateTableEstimates(newInserts map[string]int) {
+	for idx, estimate := range orchestrator.rowCountEstimate {
+		if insertedNumber, ok := newInserts[estimate.Table]; ok {
+			orchestrator.rowCountEstimate[idx].Estimate += insertedNumber
+		}
+	}
+	go orchestrator.metadataClient.UpdateRowCountEstimates(orchestrator.rowCountEstimate)
 }

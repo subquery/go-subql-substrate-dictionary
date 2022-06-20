@@ -14,6 +14,7 @@ const (
 	tableEventName           = "events"
 	tableEvmLogsName         = "evm_logs"
 	tableEvmTransactionsName = "evm_transactions"
+	tableExtrinsicName       = "extrinsics"
 	colId                    = "id"
 	colAddress               = "address"
 	colModule                = "module"
@@ -43,6 +44,14 @@ func (repoClient *eventRepoClient) evmStartDbWorker() {
 	insertEvmLogsCounter := 0
 	updateEvmTransactionCounter := 0
 	updateExtrinsicCounter := 0
+	extrinsicSuccessCounter := 0
+
+	insertedCounts := map[string]int{
+		tableEventName:           0,
+		tableExtrinsicName:       0,
+		tableEvmLogsName:         0,
+		tableEvmTransactionsName: 0,
+	}
 
 	for eventRaw := range repoClient.dbChan {
 		if eventRaw == nil {
@@ -54,13 +63,20 @@ func (repoClient *eventRepoClient) evmStartDbWorker() {
 					updateEvmTransactions[:updateEvmTransactionCounter],
 					insertEvmLogs[:insertEvmLogsCounter],
 				)
+
+				insertedCounts[tableEventName] = insertEventsCounter
+				insertedCounts[tableExtrinsicName] = updateExtrinsicCounter + extrinsicSuccessCounter
+				insertedCounts[tableEvmLogsName] = insertEvmLogsCounter
+				insertedCounts[tableEvmTransactionsName] = updateEvmTransactionCounter
+
+				repoClient.batchFinishedChan <- insertedCounts
+
 				workerCounter = 0
 				insertEventsCounter = 0
 				insertEvmLogsCounter = 0
 				updateEvmTransactionCounter = 0
 				updateExtrinsicCounter = 0
-
-				repoClient.batchFinishedChan <- struct{}{}
+				extrinsicSuccessCounter = 0
 			}
 			continue
 		}
@@ -80,6 +96,8 @@ func (repoClient *eventRepoClient) evmStartDbWorker() {
 					updateExtrinsics = append(updateExtrinsics, toBeUpdatedExtrinsic)
 				}
 				updateExtrinsicCounter++
+			} else if event.BlockHeight == extrinsicSuccessCommand {
+				extrinsicSuccessCounter++
 			} else {
 				toBeInsertedEvent := []interface{}{
 					event.Id,
@@ -138,6 +156,12 @@ func (repoClient *eventRepoClient) startDbWorker() {
 	workerCounter := 0
 	insertEventsCounter := 0
 	updateExtrinsicCounter := 0
+	extrinsicSuccessCounter := 0
+
+	insertedCounts := map[string]int{
+		tableEventName:     0,
+		tableExtrinsicName: 0,
+	}
 
 	for eventRaw := range repoClient.dbChan {
 		if eventRaw == nil {
@@ -147,11 +171,16 @@ func (repoClient *eventRepoClient) startDbWorker() {
 					insertEvents[:insertEventsCounter],
 					updateExtrinsics[:updateExtrinsicCounter],
 				)
+
+				insertedCounts[tableEventName] = insertEventsCounter
+				insertedCounts[tableExtrinsicName] = updateExtrinsicCounter + extrinsicSuccessCounter
+
+				repoClient.batchFinishedChan <- insertedCounts
+
 				workerCounter = 0
 				insertEventsCounter = 0
 				updateExtrinsicCounter = 0
-
-				repoClient.batchFinishedChan <- struct{}{}
+				extrinsicSuccessCounter = 0
 			}
 			continue
 		}
@@ -170,6 +199,8 @@ func (repoClient *eventRepoClient) startDbWorker() {
 				updateExtrinsics = append(updateExtrinsics, toBeUpdatedExtrinsic)
 			}
 			updateExtrinsicCounter++
+		} else if event.BlockHeight == extrinsicSuccessCommand {
+			extrinsicSuccessCounter++
 		} else {
 			toBeInsertedEvent := []interface{}{
 				event.Id,
