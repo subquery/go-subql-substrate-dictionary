@@ -10,7 +10,7 @@
         "program": "${workspaceFolder}/main",
         "cwd":"${workspaceFolder}",
         "args": [
-          "--configfile=config.json"
+          "--c=config.json"
         ]
       }
     ]

@@ -125,6 +125,7 @@ func NewOrchestrator(
 	)
 	metadataClient.Run(specName)
 	metadataClient.SetIndexerHealthy(true)
+	metadataClient.SetIndexerVersion(config.IndexerVersion)
 	metadataClient.UpdateTargetHeight(lastBlock)
 
 	return &Orchestrator{

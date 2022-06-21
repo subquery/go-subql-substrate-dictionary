@@ -130,3 +130,7 @@ func (client *MetadataClient) UpdateRowCountEstimates(tableEstimates []RowCountE
 func (client *MetadataClient) SetIndexerHealthy(healthy bool) {
 	client.pgClient.setIndexerHealthy(healthy)
 }
+
+func (client *MetadataClient) SetIndexerVersion(version string) {
+	client.pgClient.setIndexerVersion(version)
+}

@@ -30,22 +30,6 @@ const (
 	dynamicDatasources     = "dynamicDatasources"
 )
 
-var (
-	metadataKeyToDataType = map[string]string{
-		"lastProcessedHeight":    "int",
-		"lastProcessedTimestamp": "string",
-		"targetHeight":           "int",
-		"chain":                  "string",
-		"specName":               "string",
-		"genesisHash":            "string",
-		"indexerHealthy":         "bool",
-		"indexerNodeVersion":     "string",
-		"queryNodeVersion":       "string",
-		"rowCountEstimate":       "int",
-		"dynamicDatasources":     "string",
-	}
-)
-
 func (repoClient *metadataRepoClient) initTables(
 	tablesEstimates []RowCountEstimate,
 	genHash string,
@@ -239,6 +223,30 @@ func (repoClient *metadataRepoClient) setIndexerHealthy(healthy bool) {
 		messages.NewDictionaryMessage(
 			messages.LOG_LEVEL_ERROR,
 			messages.GetComponent(repoClient.setIndexerHealthy),
+			err,
+			messages.POSTGRES_FAILED_TO_EXECUTE_UPDATE,
+		).ConsoleLog()
+	}
+	repoClient.updateLastProcessedTimestamp(timestampInt, timestampString)
+}
+
+func (repoClient *metadataRepoClient) setIndexerVersion(version string) {
+	query := `UPDATE _metadata SET 
+	value=$1, "updatedAt"=$2 
+	WHERE key='indexerNodeVersion'`
+
+	indexerVersionJSON, _ := json.Marshal(version)
+	timestampInt, timestampString := getTimestamp()
+	_, err := repoClient.Pool.Exec(
+		context.Background(),
+		query,
+		indexerVersionJSON,
+		timestampString,
+	)
+	if err != nil {
+		messages.NewDictionaryMessage(
+			messages.LOG_LEVEL_ERROR,
+			messages.GetComponent(repoClient.setIndexerVersion),
 			err,
 			messages.POSTGRES_FAILED_TO_EXECUTE_UPDATE,
 		).ConsoleLog()

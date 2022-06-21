@@ -1,2 +1,0 @@
-1. Fail if http rpc endpoint fails
-3. If no finalized blocks are found in rocksdb, fail or go in live mode

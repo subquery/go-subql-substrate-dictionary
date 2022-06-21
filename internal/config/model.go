@@ -27,6 +27,7 @@ type RocksdbConfig struct {
 
 type Config struct {
 	Evm            bool           `json:"evm"`
+	IndexerVersion string         `json:"version"`
 	ChainConfig    ChainConfig    `json:"chain_config"`
 	RocksdbConfig  RocksdbConfig  `json:"rocksdb_config"`
 	ClientsConfig  ClientsConfig  `json:"clients_config"`

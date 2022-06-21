@@ -1,5 +1,6 @@
 {
     "evm": false,
+    "version": "1.1.2",
     "rocksdb_config": {
         "rocksdb_path": "/tmp/rocksdb-polkadot/chains/polkadot/db/full",
         "rocksdb_secondary_path": "/tmp/secondary"
