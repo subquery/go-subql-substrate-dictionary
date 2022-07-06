@@ -20,6 +20,7 @@
         "postgres_host": "localhost",
         "postgres_port": "5432",
         "postgres_db": "rock",
+        "postgres_schema": "rock",
         "postgres_conn_pool": 20
     }
 }

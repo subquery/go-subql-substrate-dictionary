@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	connStringFormat = "postgresql://%s:%s@%s:%s/%s?sslmode=disable&pool_max_conns=%d"
+	connStringFormat = "postgresql://%s:%s@%s:%s/%s?search_path=%s&sslmode=disable&pool_max_conns=%d"
 )
 
 type (
@@ -28,6 +28,7 @@ func Connect(dbConfiguration config.PostgresConfig) *PostgresClient {
 		dbConfiguration.Host,
 		dbConfiguration.Port,
 		dbConfiguration.Db,
+		dbConfiguration.Schema,
 		dbConfiguration.ConnPool,
 	)
 	messages.NewDictionaryMessage(

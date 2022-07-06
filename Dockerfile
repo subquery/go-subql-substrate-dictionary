@@ -12,3 +12,5 @@ RUN go env -w CGO_CFLAGS="-I/rocksdb/include" && \
 #FROM scratch
 FROM alpine
 COPY --from=builder /data/src/src/src /go-subql-substrate-dictionary
+COPY --from=builder /data/src/config.json /data/src/network/* /
+COPY --from=builder /data/src/network/*.json /

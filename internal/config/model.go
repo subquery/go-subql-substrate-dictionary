@@ -6,6 +6,7 @@ type PostgresConfig struct {
 	Host     string `json:"postgres_host"`
 	Port     string `json:"postgres_port"`
 	Db       string `json:"postgres_db"`
+	Schema   string `json:"postgres_schema"`
 	ConnPool int    `json:"postgres_conn_pool"`
 }
 
