@@ -21,6 +21,7 @@ type (
 
 	metadataRepoClient struct {
 		*postgres.PostgresClient
+		schemaName string
 	}
 )
 
@@ -32,10 +33,12 @@ func NewMetadataClient(
 	pgClient *postgres.PostgresClient,
 	rocksdbClient *rocksdb.RockClient,
 	httpEndpoint string,
+	schemaName string,
 ) *MetadataClient {
 	return &MetadataClient{
 		pgClient: metadataRepoClient{
 			pgClient,
+			schemaName,
 		},
 		rocksdbClient: rocksdbClient,
 		httpEndpoint:  httpEndpoint,
