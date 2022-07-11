@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"go-dictionary/internal/messages"
-	"net/http"
 	"strconv"
 	"sync"
+
+	retryablehttp "github.com/hashicorp/go-retryablehttp"
 
 	"go-dictionary/internal/db/postgres"
 	"go-dictionary/internal/db/rocksdb"
@@ -159,7 +160,7 @@ func (specVClient *SpecVersionClient) getSpecVersion(height int) int {
 	hash := specVClient.rocksdbClient.GetBlockHash(height)
 	msg := fmt.Sprintf(SPEC_VERSION_MESSAGE, hexPrefix+hash)
 	reqBody := bytes.NewBuffer([]byte(msg))
-	resp, postErr := http.Post(specVClient.httpEndpoint, "application/json", reqBody)
+	resp, postErr := retryablehttp.Post(specVClient.httpEndpoint, "application/json", reqBody)
 	if postErr != nil {
 		messages.NewDictionaryMessage(
 			messages.LOG_LEVEL_ERROR,
@@ -190,7 +191,7 @@ func (specVClient *SpecVersionClient) GetSpecName() string {
 	hash := specVClient.rocksdbClient.GetBlockHash(firstChainBlock)
 	msg := fmt.Sprintf(SPEC_VERSION_MESSAGE, hexPrefix+hash)
 	reqBody := bytes.NewBuffer([]byte(msg))
-	resp, postErr := http.Post(specVClient.httpEndpoint, "application/json", reqBody)
+	resp, postErr := retryablehttp.Post(specVClient.httpEndpoint, "application/json", reqBody)
 	if postErr != nil {
 		messages.NewDictionaryMessage(
 			messages.LOG_LEVEL_ERROR,
@@ -289,7 +290,7 @@ func (specVClient *SpecVersionClient) getAllDbSpecVersions() SpecVersionRangeLis
 func (specVClient *SpecVersionClient) UpdateMetadata(blockHeight int) {
 	hash := specVClient.rocksdbClient.GetBlockHash(blockHeight)
 	reqBody := bytes.NewBuffer([]byte(rpc.StateGetMetadata(1, hexPrefix+hash)))
-	resp, err := http.Post(specVClient.httpEndpoint, "application/json", reqBody)
+	resp, err := retryablehttp.Post(specVClient.httpEndpoint, "application/json", reqBody)
 	if err != nil {
 		messages.NewDictionaryMessage(
 			messages.LOG_LEVEL_ERROR,

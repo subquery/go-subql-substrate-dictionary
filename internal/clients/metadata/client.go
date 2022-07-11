@@ -6,7 +6,8 @@ import (
 	"go-dictionary/internal/db/postgres"
 	"go-dictionary/internal/db/rocksdb"
 	"go-dictionary/internal/messages"
-	"net/http"
+
+	retryablehttp "github.com/hashicorp/go-retryablehttp"
 
 	"github.com/itering/substrate-api-rpc/rpc"
 )
@@ -80,7 +81,7 @@ func (client *MetadataClient) getRowCountEstimates() []RowCountEstimate {
 
 func (client *MetadataClient) getChainName() string {
 	reqBody := bytes.NewBuffer(CHAIN_MESSAGE)
-	resp, err := http.Post(
+	resp, err := retryablehttp.Post(
 		client.httpEndpoint,
 		"application/json",
 		reqBody,
