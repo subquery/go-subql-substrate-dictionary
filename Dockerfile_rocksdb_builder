@@ -3,4 +3,6 @@ RUN apt-get update && apt-get install -y git golang make libgflags-dev libsnappy
 RUN git clone -b v6.29.3 --depth 1 https://github.com/facebook/rocksdb.git /rocksdb && cd /rocksdb &&\
     export CXXFLAGS='-Wno-error=deprecated-copy -Wno-error=pessimizing-move -Wno-error=class-memaccess' &&\
     make static_lib
+COPY ./go.mod ./go.sum /data/src/
+RUN cd /data/src/ && go mod download
 # docker build -t yesq/rocksdb_builder:v6.29.3 .

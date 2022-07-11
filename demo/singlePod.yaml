@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: polkadot-config
+data:
+  config.json: |
+    {
+        "evm": false,
+        "version": "1.1.2",
+        "rocksdb_config": {
+            "rocksdb_path": "/datav/chains/polkadot/db/full",
+            "rocksdb_secondary_path": "/tmp/secondary"
+        },
+        "clients_config": {
+            "events_workers": 150,
+            "extrinsics_workers": 100,
+            "batch_size": 500
+        },
+        "chain_config": {
+            "http_rpc_endpoint": "http://{...}:9933",
+            "decoder_types_file": "/polkadot.json"
+        },
+        "postgres_config": {
+            "postgres_user": "{...}",
+            "postgres_password": "{...}",
+            "postgres_host": "{...}",
+            "postgres_port": "5432",
+            "postgres_db": "{...}",
+            "postgres_schema": "{...}",
+            "postgres_conn_pool": 20
+        }
+    }
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: task-pv-pod-moss-{...}-polkadot
+spec:
+  #nodeName: ip-10-1-78-63.ap-southeast-2.compute.internal
+  #affinity:
+  #  podAffinity: 
+  #    requiredDuringSchedulingIgnoredDuringExecution: 
+  #    - labelSelector:
+  #        matchExpressions:
+  #        - key: release 
+  #          operator: In 
+  #          values:
+  #          - node-6950640998886567936
+  #      topologyKey: failure-domain.beta.kubernetes.io/zone
+  volumes:
+    - name: task-pv-storage
+      persistentVolumeClaim:
+        claimName: {...}
+    - name: config-volume
+      configMap:
+        name: polkadot-config
+  containers:
+    - name: task-pv-container
+      image: yesq/go-dict
+      imagePullPolicy: Always
+#      command: ["/bin/sh"]
+#      args: ["-c", "echo 1 > a && tail -f a"]
+      volumeMounts:
+        - mountPath: "/datav"
+          name: task-pv-storage
+        - name: config-volume
+          mountPath: /config.json
+          subPath: config.json
