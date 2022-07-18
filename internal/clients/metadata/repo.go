@@ -101,10 +101,9 @@ func (repoClient *metadataRepoClient) initTables(
 
 // getTablesName returns the table names used by the dictionary instance
 func (repoClient *metadataRepoClient) getTablesName() []string {
-	query := `SELECT tablename
+	query := fmt.Sprintf(`SELECT tablename
 	FROM pg_catalog.pg_tables
-	WHERE schemaname != 'pg_catalog' AND 
-		schemaname != 'information_schema';`
+	WHERE schemaname = '%s';`, repoClient.schemaName)
 
 	rows, err := repoClient.Pool.Query(context.Background(), query)
 	if err != nil {

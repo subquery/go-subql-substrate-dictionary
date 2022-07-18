@@ -122,6 +122,7 @@ func NewOrchestrator(
 		pgClient,
 		rdbClient,
 		config.ChainConfig.HttpRpcEndpoint,
+		config.PostgresConfig.Schema,
 	)
 	metadataClient.Run(specName)
 	metadataClient.SetIndexerHealthy(true)

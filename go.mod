@@ -6,6 +6,7 @@ go 1.18
 
 require (
 	github.com/ChainSafe/gossamer v0.6.0
+	github.com/hashicorp/go-retryablehttp v0.7.1
 	github.com/itering/scale.go v1.2.1
 	github.com/itering/substrate-api-rpc v0.4.11
 	github.com/jackc/pgx/v4 v4.15.0
@@ -18,6 +19,7 @@ require (
 	github.com/OneOfOne/xxhash v1.2.5 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
+	github.com/hashicorp/go-cleanhttp v0.5.1 // indirect
 	github.com/huandu/xstrings v1.3.2 // indirect
 	github.com/ipfs/go-cid v0.0.7 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect

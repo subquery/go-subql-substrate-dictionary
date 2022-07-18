@@ -6,7 +6,9 @@ import (
 	"go-dictionary/internal/db/postgres"
 	"go-dictionary/internal/db/rocksdb"
 	"go-dictionary/internal/messages"
-	"net/http"
+	"time"
+
+	retryablehttp "github.com/hashicorp/go-retryablehttp"
 
 	"github.com/itering/substrate-api-rpc/rpc"
 )
@@ -21,6 +23,7 @@ type (
 
 	metadataRepoClient struct {
 		*postgres.PostgresClient
+		schemaName string
 	}
 )
 
@@ -32,10 +35,12 @@ func NewMetadataClient(
 	pgClient *postgres.PostgresClient,
 	rocksdbClient *rocksdb.RockClient,
 	httpEndpoint string,
+	schemaName string,
 ) *MetadataClient {
 	return &MetadataClient{
 		pgClient: metadataRepoClient{
 			pgClient,
+			schemaName,
 		},
 		rocksdbClient: rocksdbClient,
 		httpEndpoint:  httpEndpoint,
@@ -77,7 +82,9 @@ func (client *MetadataClient) getRowCountEstimates() []RowCountEstimate {
 
 func (client *MetadataClient) getChainName() string {
 	reqBody := bytes.NewBuffer(CHAIN_MESSAGE)
-	resp, err := http.Post(
+	retryClient := retryablehttp.NewClient()
+	retryClient.RetryWaitMin = 15 * time.Second
+	resp, err := retryClient.Post(
 		client.httpEndpoint,
 		"application/json",
 		reqBody,
