@@ -11,8 +11,6 @@ create table events (
 create table extrinsics (
     id text not null primary key,
     -- {blockHeight-extrinsicIdx}
-    tx_hash text not null,
-    -- with index
     module text not null,
     -- with index
     call text not null,

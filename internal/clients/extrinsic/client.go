@@ -209,8 +209,7 @@ func (client *ExtrinsicClient) evmStartWorker() {
 					Call:        extrinsicCallFunction,
 					BlockHeight: job.BlockHeight,
 					Success:     true, //the real value is get from events
-					TxHash:      getHash(job.BlockHeight, decodedExtrinsic, rawExtrinsic),
-					IsSigned:    isSigned(decodedExtrinsic),
+					IsSigned: isSigned(decodedExtrinsic),
 				}
 				client.pgClient.insertExtrinsic(&extrinsicModel)
 			}
@@ -269,8 +268,7 @@ func (client *ExtrinsicClient) startWorker() {
 					Call:        getCallFunction(job.BlockHeight, decodedExtrinsic),
 					BlockHeight: job.BlockHeight,
 					Success:     true, //the real value is get from events
-					TxHash:      getHash(job.BlockHeight, decodedExtrinsic, rawExtrinsic),
-					IsSigned:    isSigned(decodedExtrinsic),
+					IsSigned: isSigned(decodedExtrinsic),
 				}
 				client.pgClient.insertExtrinsic(&extrinsicModel)
 			}

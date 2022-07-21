@@ -55,7 +55,6 @@ func (repoClient *extrinsicRepoClient) evmStartDbWorker() {
 		case *Extrinsic:
 			toBeInsertedExtrinsic := []interface{}{
 				extrinsic.Id,
-				extrinsic.TxHash,
 				extrinsic.Module,
 				extrinsic.Call,
 				extrinsic.BlockHeight,
@@ -112,7 +111,6 @@ func (repoClient *extrinsicRepoClient) startDbWorker() {
 		extrinsic := extrinsicRaw.(*Extrinsic)
 		toBeInsertedExtrinsic := []interface{}{
 			extrinsic.Id,
-			extrinsic.TxHash,
 			extrinsic.Module,
 			extrinsic.Call,
 			extrinsic.BlockHeight,
@@ -218,7 +216,6 @@ func (repoClient *extrinsicRepoClient) copyExtrinsicsInTx(tx pgx.Tx, insertExtri
 		pgx.Identifier{tableExtrinsicName},
 		[]string{
 			colId,
-			colTxHash,
 			colModule,
 			colCall,
 			colBlockHeight,

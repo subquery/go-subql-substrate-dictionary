@@ -21,8 +21,7 @@ const (
 
 type (
 	Extrinsic struct {
-		Id          string //blockHeight-extrinsicId
-		TxHash      string
+		Id string //blockHeight-extrinsicId
 		Module      string
 		Call        string
 		BlockHeight int
