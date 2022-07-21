@@ -1,4 +1,4 @@
-FROM yesq/rocksdb_builder:v6.29.3 as builder
+FROM onfinality/go-dict:builder as builder
 COPY ./ /data/src/
 RUN go env -w CGO_CFLAGS="-I/rocksdb/include" && \
     go env -w CGO_LDFLAGS="-L/rocksdb -lrocksdb -lstdc++ -lm -lz -lbz2 -lsnappy -llz4 -lzstd" &&\
@@ -7,6 +7,7 @@ RUN go env -w CGO_CFLAGS="-I/rocksdb/include" && \
 #FROM ubuntu
 #FROM scratch
 FROM alpine
+RUN apk add bash jq
 COPY --from=builder /data/src/entrypoint.sh /
 COPY --from=builder /data/src/src/src /go-subql-substrate-dictionary
 COPY --from=builder /data/src/config.json /data/src/network/* /

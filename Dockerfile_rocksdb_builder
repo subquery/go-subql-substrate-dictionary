@@ -5,4 +5,6 @@ RUN git clone -b v6.29.3 --depth 1 https://github.com/facebook/rocksdb.git /rock
     make static_lib
 COPY ./go.mod ./go.sum /data/src/
 RUN cd /data/src/ && go mod download
-# docker build -t yesq/rocksdb_builder:v6.29.3 .
+# docker build -t onfinality/go-dict:builder .
+# PLEASE NOTE this image was build on chip AMD EPYC 7571. Then the binary can run on both Intel and AMD chips.
+# Maybe adjust rocksdb compiling parameters could remove AMD chips dependence. This need be confirmed.
