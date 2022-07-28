@@ -89,6 +89,7 @@ func NewOrchestrator(
 		rdbClient,
 		config.ClientsConfig.ExtrinsicsWorkers,
 		specVersionClient,
+		config.IssueBlocks,
 	)
 	extrinsicClient.Run(config.Evm)
 	messages.NewDictionaryMessage(

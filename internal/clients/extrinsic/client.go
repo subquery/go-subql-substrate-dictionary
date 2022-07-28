@@ -3,6 +3,7 @@ package extrinsic
 import (
 	"fmt"
 	"go-dictionary/internal/clients/specversion"
+	"go-dictionary/internal/config"
 	"go-dictionary/internal/db/postgres"
 	"go-dictionary/internal/db/rocksdb"
 	"go-dictionary/internal/messages"
@@ -22,6 +23,7 @@ type (
 		workersCount      int
 		batchChan         chan chan *ExtrinsicJob
 		specVersionClient *specversion.SpecVersionClient
+		issueBlocks       config.IssueBlocks
 	}
 
 	extrinsicRepoClient struct {
@@ -46,6 +48,7 @@ func NewExtrinsicClient(
 	rocksdbClient *rocksdb.RockClient,
 	workersCount int,
 	specVersionClient *specversion.SpecVersionClient,
+	issueBlocks config.IssueBlocks,
 ) *ExtrinsicClient {
 
 	batchChan := make(chan chan *ExtrinsicJob, workersCount)
@@ -63,6 +66,7 @@ func NewExtrinsicClient(
 		workersCount:      workersCount,
 		batchChan:         batchChan,
 		specVersionClient: specVersionClient,
+		issueBlocks:       issueBlocks,
 	}
 }
 
