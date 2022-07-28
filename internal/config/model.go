@@ -27,7 +27,7 @@ type RocksdbConfig struct {
 }
 
 type IssueBlocks struct {
-	Blocks []string `json:"blocks"`
+	Blocks []int `json:"blocks"`
 }
 
 type Config struct {

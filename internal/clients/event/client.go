@@ -267,11 +267,23 @@ func (client *EventClient) startWorker() {
 	for jobChan := range client.batchChan {
 		for job := range jobChan {
 			issueJob = job
+			ifContinue := false
 			for _, IssueBlock := range client.issueBlocks.Blocks {
-				if IssueBlock == fmt.Sprint(job.BlockHeight) {
-					fmt.Println("Match block")
-					panic(job)
+				if IssueBlock == job.BlockHeight {
+					messages.NewDictionaryMessage(
+						messages.LOG_LEVEL_INFO,
+						"EventClient.startWorker",
+						fmt.Errorf("%v+", err),
+						"Match issue job: %v+",
+						issueJob,
+					).ConsoleLog()
+					ifContinue = true
+					break
 				}
+			}
+			if ifContinue {
+				ifContinue = false
+				continue
 			}
 			rawHeaderData := client.rocksdbClient.GetHeaderForBlockLookupKey(job.BlockLookupKey)
 			headerDecoder.Init(types.ScaleBytes{Data: rawHeaderData}, nil)

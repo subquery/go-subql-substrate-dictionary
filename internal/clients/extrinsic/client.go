@@ -239,6 +239,24 @@ func (client *ExtrinsicClient) startWorker() {
 	for jobChan := range client.batchChan {
 		for job := range jobChan {
 			issueJob = job
+			ifContinue := false
+			for _, IssueBlock := range client.issueBlocks.Blocks {
+				if IssueBlock == job.BlockHeight {
+					messages.NewDictionaryMessage(
+						messages.LOG_LEVEL_INFO,
+						"ExtrinsicClient.startWorker",
+						fmt.Errorf("%v+", err),
+						"Match issue job: %v+",
+						issueJob,
+					).ConsoleLog()
+					ifContinue = true
+					break
+				}
+			}
+			if ifContinue {
+				ifContinue = false
+				continue
+			}
 			rawBodyData := client.rocksdbClient.GetBodyForBlockLookupKey(job.BlockLookupKey)
 			bodyDecoder.Init(types.ScaleBytes{Data: rawBodyData}, nil)
 			decodedBody := bodyDecoder.ProcessAndUpdateData(bodyTypeString)
