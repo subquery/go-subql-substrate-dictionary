@@ -223,11 +223,10 @@ func (client *ExtrinsicClient) startWorker() {
 	var issueJob *ExtrinsicJob = nil
 	defer func() {
 		if err := recover(); err != nil {
-			err := err.(error)
 			messages.NewDictionaryMessage(
 				messages.LOG_LEVEL_ERROR,
 				"ExtrinsicClient.startWorker",
-				err,
+				fmt.Errorf("%v+", err),
 				"Issue job: %v+",
 				issueJob,
 			).ConsoleLog()

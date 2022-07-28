@@ -247,11 +247,10 @@ func (client *EventClient) startWorker() {
 	var issueJob *eventJob = nil
 	defer func() {
 		if err := recover(); err != nil {
-			err := err.(error)
 			messages.NewDictionaryMessage(
 				messages.LOG_LEVEL_ERROR,
 				"EventClient.startWorker",
-				err,
+				fmt.Errorf("%v+", err),
 				"Issue job: %v+",
 				issueJob,
 			).ConsoleLog()
