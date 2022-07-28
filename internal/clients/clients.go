@@ -106,6 +106,7 @@ func NewOrchestrator(
 		rdbClient,
 		config.ClientsConfig.EventsWorkers,
 		specVersionClient,
+		config.IssueBlocks,
 	)
 	eventClient.Run(config.Evm)
 	messages.NewDictionaryMessage(
