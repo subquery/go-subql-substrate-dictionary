@@ -251,7 +251,13 @@ func (client *EventClient) startWorker() {
 	var issueJob *eventJob = nil
 	defer func() {
 		if err := recover(); err != nil {
-			fmt.Printf("panic error: %v, issueJob: %v", err, issueJob)
+			messages.NewDictionaryMessage(
+				messages.LOG_LEVEL_ERROR,
+				"EventClient.startWorker",
+				fmt.Errorf("%v", err),
+				"panic job: %v+",
+				issueJob,
+			).ConsoleLog()
 		}
 	}()
 	headerDecoder := types.ScaleDecoder{}
