@@ -35,6 +35,9 @@ function configureFromENV () {
         fi
         cat /config.json | jq ".chain_config.decoder_types_file=\"$CFG_CHAIN_FML\"" > /config.json.tmp && mv config.json.tmp config.json
     fi
+    if [[ (-v CFG_ISSUE_BLOCKS) ]]; then
+        cat /config.json | jq ".issue_blocks.blocks=[$CFG_ISSUE_BLOCKS]" > /config.json.tmp && mv config.json.tmp config.json
+    fi
 
 }
 
