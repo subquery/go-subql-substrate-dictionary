@@ -249,6 +249,17 @@ func (client *EventClient) evmStartWorker() {
 
 func (client *EventClient) startWorker() {
 	var issueJob *eventJob = nil
+	defer func() {
+		if err := recover(); err != nil {
+			messages.NewDictionaryMessage(
+				messages.LOG_LEVEL_INFO,
+				"EventClient.startWorker",
+				fmt.Errorf("%v", err),
+				"panic job: %v+",
+				issueJob,
+			).ConsoleLog()
+		}
+	}()
 	headerDecoder := types.ScaleDecoder{}
 	eventDecoder := scale.EventsDecoder{}
 	eventDecoderOption := types.ScaleDecoderOption{Metadata: nil, Spec: -1}
@@ -264,7 +275,7 @@ func (client *EventClient) startWorker() {
 						"EventClient.startWorker",
 						nil,
 						"Match issue job: %v+",
-						issueJob,
+						job,
 					).ConsoleLog()
 					ifContinue = true
 					break
