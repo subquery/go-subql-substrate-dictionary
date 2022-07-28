@@ -244,12 +244,26 @@ func (client *EventClient) evmStartWorker() {
 }
 
 func (client *EventClient) startWorker() {
+	var issueJob *eventJob = nil
+	defer func() {
+		if err := recover(); err != nil {
+			err := err.(error)
+			messages.NewDictionaryMessage(
+				messages.LOG_LEVEL_ERROR,
+				"EventClient.startWorker",
+				err,
+				"Issue job: %v+",
+				issueJob,
+			).ConsoleLog()
+		}
+	}()
 	headerDecoder := types.ScaleDecoder{}
 	eventDecoder := scale.EventsDecoder{}
 	eventDecoderOption := types.ScaleDecoderOption{Metadata: nil, Spec: -1}
 
 	for jobChan := range client.batchChan {
 		for job := range jobChan {
+			issueJob = job
 			rawHeaderData := client.rocksdbClient.GetHeaderForBlockLookupKey(job.BlockLookupKey)
 			headerDecoder.Init(types.ScaleBytes{Data: rawHeaderData}, nil)
 			decodedHeader := headerDecoder.ProcessAndUpdateData(headerTypeString)

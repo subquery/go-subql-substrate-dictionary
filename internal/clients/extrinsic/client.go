@@ -209,7 +209,7 @@ func (client *ExtrinsicClient) evmStartWorker() {
 					Call:        extrinsicCallFunction,
 					BlockHeight: job.BlockHeight,
 					Success:     true, //the real value is get from events
-					IsSigned: isSigned(decodedExtrinsic),
+					IsSigned:    isSigned(decodedExtrinsic),
 				}
 				client.pgClient.insertExtrinsic(&extrinsicModel)
 			}
@@ -220,12 +220,26 @@ func (client *ExtrinsicClient) evmStartWorker() {
 }
 
 func (client *ExtrinsicClient) startWorker() {
+	var issueJob *ExtrinsicJob = nil
+	defer func() {
+		if err := recover(); err != nil {
+			err := err.(error)
+			messages.NewDictionaryMessage(
+				messages.LOG_LEVEL_ERROR,
+				"ExtrinsicClient.startWorker",
+				err,
+				"Issue job: %v+",
+				issueJob,
+			).ConsoleLog()
+		}
+	}()
 	bodyDecoder := types.ScaleDecoder{}
 	extrinsicDecoder := scale.ExtrinsicDecoder{}
 	extrinsicDecoderOption := types.ScaleDecoderOption{Metadata: nil, Spec: -1}
 
 	for jobChan := range client.batchChan {
 		for job := range jobChan {
+			issueJob = job
 			rawBodyData := client.rocksdbClient.GetBodyForBlockLookupKey(job.BlockLookupKey)
 			bodyDecoder.Init(types.ScaleBytes{Data: rawBodyData}, nil)
 			decodedBody := bodyDecoder.ProcessAndUpdateData(bodyTypeString)
@@ -268,7 +282,7 @@ func (client *ExtrinsicClient) startWorker() {
 					Call:        getCallFunction(job.BlockHeight, decodedExtrinsic),
 					BlockHeight: job.BlockHeight,
 					Success:     true, //the real value is get from events
-					IsSigned: isSigned(decodedExtrinsic),
+					IsSigned:    isSigned(decodedExtrinsic),
 				}
 				client.pgClient.insertExtrinsic(&extrinsicModel)
 			}

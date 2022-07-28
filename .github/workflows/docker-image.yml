@@ -2,7 +2,7 @@ name: Docker Image CI
 
 on:
   push:
-    branches: [ "main", "m0ssc0de-patch-1-ci" ]
+    branches: [ "main", "issue-size" ]
   pull_request:
     branches: [ "main" ]
 
