@@ -245,7 +245,7 @@ func (client *ExtrinsicClient) startWorker() {
 					messages.NewDictionaryMessage(
 						messages.LOG_LEVEL_INFO,
 						"ExtrinsicClient.startWorker",
-						fmt.Errorf("%v+", err),
+						nil,
 						"Match issue job: %v+",
 						issueJob,
 					).ConsoleLog()

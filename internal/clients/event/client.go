@@ -273,7 +273,7 @@ func (client *EventClient) startWorker() {
 					messages.NewDictionaryMessage(
 						messages.LOG_LEVEL_INFO,
 						"EventClient.startWorker",
-						fmt.Errorf("%v+", err),
+						nil,
 						"Match issue job: %v+",
 						issueJob,
 					).ConsoleLog()
