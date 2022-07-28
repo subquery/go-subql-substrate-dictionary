@@ -26,6 +26,10 @@ type RocksdbConfig struct {
 	RocksdbSecondaryPath string `json:"rocksdb_secondary_path"`
 }
 
+type IssueBlocks struct {
+	Blocks []string `json:"blocks"`
+}
+
 type Config struct {
 	Evm            bool           `json:"evm"`
 	IndexerVersion string         `json:"version"`
@@ -33,4 +37,5 @@ type Config struct {
 	RocksdbConfig  RocksdbConfig  `json:"rocksdb_config"`
 	ClientsConfig  ClientsConfig  `json:"clients_config"`
 	PostgresConfig PostgresConfig `json:"postgres_config"`
+	IssueBlocks    IssueBlocks    `json:"issue_blocks"`
 }

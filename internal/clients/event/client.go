@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"go-dictionary/internal/clients/specversion"
+	"go-dictionary/internal/config"
 	"go-dictionary/internal/db/postgres"
 	"go-dictionary/internal/db/rocksdb"
 	"go-dictionary/internal/messages"
@@ -25,6 +26,7 @@ type (
 		workersCount      int
 		batchChan         chan chan *eventJob
 		specVersionClient *specversion.SpecVersionClient
+		issueBlocks       config.IssueBlocks
 	}
 
 	eventRepoClient struct {
@@ -48,6 +50,7 @@ func NewEventClient(
 	rocksdbClient *rocksdb.RockClient,
 	workersCount int,
 	specVersionClient *specversion.SpecVersionClient,
+	issueBlocks config.IssueBlocks,
 ) *EventClient {
 	batchChan := make(chan chan *eventJob, workersCount)
 	dbChan := make(chan interface{}, workersCount)
@@ -64,6 +67,7 @@ func NewEventClient(
 		workersCount:      workersCount,
 		batchChan:         batchChan,
 		specVersionClient: specVersionClient,
+		issueBlocks:       issueBlocks,
 	}
 }
 
@@ -263,6 +267,12 @@ func (client *EventClient) startWorker() {
 	for jobChan := range client.batchChan {
 		for job := range jobChan {
 			issueJob = job
+			for _, IssueBlock := range client.issueBlocks.Blocks {
+				if IssueBlock == fmt.Sprint(job.BlockHeight) {
+					fmt.Println("Match block")
+					panic(job)
+				}
+			}
 			rawHeaderData := client.rocksdbClient.GetHeaderForBlockLookupKey(job.BlockLookupKey)
 			headerDecoder.Init(types.ScaleBytes{Data: rawHeaderData}, nil)
 			decodedHeader := headerDecoder.ProcessAndUpdateData(headerTypeString)
