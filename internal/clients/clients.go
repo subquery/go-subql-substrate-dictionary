@@ -143,6 +143,49 @@ func NewOrchestrator(
 	}
 }
 
+func (orchestrator *Orchestrator) Batch(blockHeight int) {
+	currentSpecv := &specversion.SpecVersionRange{}
+	var specvNum int
+	workerExtrinsic := "EXTRINSIC"
+	workerEvent := "EVENT"
+
+	extrinsicBatchChannel := orchestrator.extrinsicClient.StartBatch()
+	startingExtrinsic := orchestrator.extrinsicClient.RecoverLastInsertedBlock()
+
+	messages.NewDictionaryMessage(
+		messages.LOG_LEVEL_INFO,
+		"",
+		nil,
+		ORCHESTRATOR_START_PROCESSING,
+		workerExtrinsic,
+		startingExtrinsic,
+	).ConsoleLog()
+
+	eventBatchChannel := orchestrator.eventClient.StartBatch()
+	startingEvent := orchestrator.eventClient.RecoverLastInsertedBlock()
+	messages.NewDictionaryMessage(
+		messages.LOG_LEVEL_INFO,
+		"",
+		nil,
+		ORCHESTRATOR_START_PROCESSING,
+		workerEvent,
+		startingEvent,
+	).ConsoleLog()
+
+	lastBlock := blockHeight
+	if startingExtrinsic == 0 && lastBlock != 0 {
+		currentSpecv = orchestrator.specversionClient.GetSpecVersion(startingExtrinsic + 1)
+		orchestrator.specversionClient.UpdateMetadata(startingExtrinsic + 1)
+	} else {
+		currentSpecv = orchestrator.specversionClient.GetSpecVersion(startingExtrinsic)
+		orchestrator.specversionClient.UpdateMetadata(startingExtrinsic)
+	}
+	specvNum, _ = strconv.Atoi(currentSpecv.SpecVersion)
+	lookupKey := orchestrator.rdbClient.GetLookupKeyForBlockHeight(blockHeight)
+	eventBatchChannel.SendWork(blockHeight, lookupKey, specvNum)
+	extrinsicBatchChannel.SendWork(blockHeight, lookupKey, specvNum)
+}
+
 func (orchestrator *Orchestrator) Run() {
 	currentSpecv := &specversion.SpecVersionRange{}
 	var specvNum int

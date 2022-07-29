@@ -11,10 +11,12 @@ func main() {
 	var (
 		configFilePath          string
 		dictionaryConfiguration config.Config
+		batchBlock              int
 	)
 
 	flag.StringVar(&configFilePath, "config", "", "path to config file")
 	flag.StringVar(&configFilePath, "c", "", "path to config file")
+	flag.IntVar(&batchBlock, "b", 0, "specific a block to batch")
 	flag.Parse()
 	if configFilePath == "" {
 		messages.NewDictionaryMessage(messages.LOG_LEVEL_INFO, "", nil, messages.CONFIG_NO_CUSTOM_PATH_SPECIFIED).ConsoleLog()
@@ -26,5 +28,9 @@ func main() {
 	orchestrator := clients.NewOrchestrator(dictionaryConfiguration)
 	defer orchestrator.Close()
 
-	orchestrator.Run()
+	if batchBlock != 0 {
+		orchestrator.Batch(batchBlock)
+	} else {
+		orchestrator.Run()
+	}
 }
