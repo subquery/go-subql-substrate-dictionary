@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"go-dictionary/internal/clients"
 	"go-dictionary/internal/config"
 	"go-dictionary/internal/messages"
@@ -29,6 +30,7 @@ func main() {
 	defer orchestrator.Close()
 
 	if batchBlock != 0 {
+		fmt.Printf("specific block %d.", batchBlock)
 		orchestrator.Batch(batchBlock)
 	} else {
 		orchestrator.Run()
